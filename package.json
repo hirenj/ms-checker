@@ -1,0 +1,13 @@
+{
+  "name": "ms-checker",
+  "main": "./html/index.html",
+  "window": {
+    "frame": true,
+    "toolbar": false
+  },
+  "dependencies": {
+    "nconf": "^0.7.1",
+    "optimist": "^0.6.1",
+    "sqlite3": "^3.0.5"
+  }
+}
