@@ -21,9 +21,164 @@ if (files_to_open.length < 1) {
 	document.getElementById('fileDialog').click();
 }
 
+var sql_string = 'SELECT \
+	peptides.PeptideID, \
+	peptides.UniquePeptideSequenceID, \
+	peptides.SpectrumID, \
+	PrecursorIonQuanResultsSearchSpectra.QuanResultID, \
+	PrecursorIonQuanResults.QuanChannelID, \
+	PrecursorIonQuanResults.Area \
+FROM peptides \
+	LEFT JOIN PrecursorIonQuanResultsSearchSpectra \
+		ON peptides.SpectrumID = PrecursorIonQuanResultsSearchSpectra.SearchSpectrumID \
+	LEFT JOIN PrecursorIonQuanResults \
+		ON PrecursorIonQuanResultsSearchSpectra.QuanResultID = PrecursorIonQuanResults.QuanResultID \
+WHERE peptides.ConfidenceLevel = 3 \
+AND peptides.PeptideID in (SELECT distinct PeptideID \
+	FROM PeptidesAminoAcidModifications \
+	WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \
+		FROM AminoAcidModifications \
+		WHERE ModificationName like "%Hex%") \
+	)';
+
+var related_quants = 'SELECT \
+	EventID, \
+	FileID, \
+	Mass, \
+	RT, \
+	LeftRT, \
+	RightRT, \
+	Charge \
+FROM EventAnnotations \
+	JOIN Events USING(EventID) \
+WHERE QuanResultID = ?';
+
+var search_pair_sql = 'SELECT \
+	* \
+FROM Events \
+WHERE 	FileID = ? AND \
+		RT >= ? AND \
+		RT <= ? AND \
+		Mass >= ? AND \
+		Mass <= ? \
+';
+
+var find_dimethyls = function(db,pep,callback) {
+	db.get('SELECT count(distinct Position) as count from PeptidesAminoAcidModifications JOIN AminoAcidModifications USING(AminoAcidModificationID) WHERE PeptideID = ? AND (ModificationName = "Dimethyl" OR ModificationName = "Dimethyl:2H(4)")', [pep.PeptideID], function(err,val) {
+		setTimeout(function() {
+			check_potential_pair(db,pep,(val.count || 0) + 1,callback);
+		},0);
+	});
+};
+
+
+
+var validated_quans = {};
+
+var check_potential_pair = function(db,pep,num_dimethyl,callback) {
+	if (! pep.QuanResultID) {
+		return;
+	}
+	if (pep.QuanResultID in validated_quans) {
+		pep.has_pair = validated_quans[pep.QuanResultID];
+		callback();
+		return;
+	}
+	if ( ! num_dimethyl ) {
+		find_dimethyls(db,pep,callback);
+		return;
+	}
+	pep.has_pair = false;
+	var mass_change_dir = 1;
+	if (pep.QuanChannelID.indexOf(2) >= 0) {
+		mass_change_dir = -1;
+	}
+	db.all(related_quants,[ pep.QuanResultID ],function(err,events) {
+		var events_length = events.length;
+		events.forEach(function(ev) {
+			events_length -= 1;
+			if (pep.has_pair) {
+				if (events_length <= 0) {
+					validated_quans[pep.QuanResultID] = pep.has_pair;
+					callback();
+				}
+				return;
+			}
+			var target_mass = ev.Mass + (mass_change_dir * num_dimethyl * (32.056407-28.0313)/ev.Charge);
+			// console.log(ev.Mass);
+			// console.log(ev.Charge);
+			// console.log(pep.QuanChannelID);
+			// console.log(target_mass);
+			db.all(search_pair_sql, [ ev.FileID, ev.LeftRT - 0.05, ev.RightRT + 0.05, target_mass*(1 - 15/1000000) , target_mass*(1 + 15/1000000)],function(err,rows) {
+				if (rows && rows.length > 0) {
+					pep.has_pair = true;	
+				}
+				if (events_length <= 0) {
+					validated_quans[pep.QuanResultID] = pep.has_pair;
+					callback();
+				}
+			});
+		});
+	});
+};
+
+var combine_peptides = function(peps) {
+	var all_peps = {};
+	peps.forEach(function(pep) {
+		var curr_pep = all_peps[pep.PeptideID] ||  pep;
+		curr_pep.areas = curr_pep.areas || [];
+
+		if (! Array.isArray(curr_pep.QuanChannelID) ) {
+			curr_pep.QuanChannelID =  curr_pep.QuanChannelID ? [ curr_pep.QuanChannelID ] : [];
+		}
+		if (curr_pep != pep && pep.QuanChannelID) {
+			curr_pep.QuanChannelID.push(pep.QuanChannelID);
+		}
+		if (pep.Area) {
+			curr_pep.areas.push(pep.Area);
+		}
+		all_peps[pep.PeptideID] = curr_pep;
+	});
+	return Object.keys(all_peps).map(function(key) { return all_peps[key]; });
+};
+
 var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(err) {
-	console.log(arguments);
-	console.log(db);
+	var to_validate = [];
+	var validated = [];
+	db.all(sql_string,function(err,peps) {
+		console.log("Retrieved peptides to search: "+(peps.length)+" total peptides");
+		singlet_peps = combine_peptides(peps).filter(function(pep) {
+			return pep.QuanChannelID.length == 1;
+		});
+		singlet_peps.forEach(function(pep) {
+			check_potential_pair(db,pep,null,function(masses) {
+				if (pep.has_pair) {
+					if (to_validate.indexOf(pep.QuanResultID) < 0) {
+						to_validate.push(pep.QuanResultID);
+						console.log(pep);
+					}
+					console.log("Need to validate "+to_validate.length);
+				} else {
+					if (validated.indexOf(pep.QuanResultID) < 0) {
+						validated.push(pep.QuanResultID);
+					}
+					console.log("Now validated "+validated.length);
+				}
+			});
+		});
+		// console.log(arguments);
+	});
+
+
+
+	// Area is the sum of Areas for the Events associated with the QuanResultID (from EventAnnotations)
+
+	// select PeptideId,SpectrumID from peptides where peptides.ConfidenceLevel = 3
+
+	// select QuanResultID, SearchSpectrumID from PrecursorIonQuanResultsSearchSpectra where SearchSpectrumID = ?
+
+	// select * from PrecursorIonQuanResults where QuanResultID = ?
+
 	// We want to search:
 	//  This looks like this is all the spectra that were used to search for an area
 	//	PrecursorIonAreaSearchSpectra
