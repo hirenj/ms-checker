@@ -25,6 +25,7 @@ var sql_string = 'SELECT \
 	peptides.PeptideID, \
 	peptides.UniquePeptideSequenceID, \
 	peptides.SpectrumID, \
+	peptides.Sequence, \
 	PrecursorIonQuanResultsSearchSpectra.QuanResultID, \
 	PrecursorIonQuanResults.QuanChannelID, \
 	PrecursorIonQuanResults.Area \
@@ -63,12 +64,37 @@ WHERE 	FileID = ? AND \
 		Mass <= ? \
 ';
 
+var dimethyl_counts = 'SELECT \
+	count(distinct Position) as count, PeptideID \
+FROM PeptidesAminoAcidModifications \
+	JOIN AminoAcidModifications USING(AminoAcidModificationID) \
+WHERE (ModificationName = "Dimethyl" OR ModificationName = "Dimethyl:2H(4)") GROUP BY PeptideID';
+
+
+var dimethyl_count_cache = null;
+
 var find_dimethyls = function(db,pep,callback) {
-	db.get('SELECT count(distinct Position) as count from PeptidesAminoAcidModifications JOIN AminoAcidModifications USING(AminoAcidModificationID) WHERE PeptideID = ? AND (ModificationName = "Dimethyl" OR ModificationName = "Dimethyl:2H(4)")', [pep.PeptideID], function(err,val) {
-		setTimeout(function() {
-			check_potential_pair(db,pep,(val.count || 0) + 1,callback);
-		},0);
-	});
+	if (! dimethyl_count_cache ) {
+		dimethyl_count_cache = {};
+		console.log("Populating Dimethyl cache");
+		db.all(dimethyl_counts,[],function(err,data) {
+			dimethyl_count_cache = {};
+			data.forEach(function(count) {
+				dimethyl_count_cache[count.PeptideID] = count.count;
+			});
+			setTimeout(function() {
+				console.log("Populated Dimethyl cache");
+				find_dimethyls(db,pep,callback);
+				if ( ! pep.QuanResultID ) {
+					callback();
+				}
+			},0);
+		});
+		return;
+	}
+	setTimeout(function() {
+		check_potential_pair(db,pep,dimethyl_count_cache[pep.PeptideID],callback);
+	},0);
 };
 
 
@@ -83,6 +109,9 @@ var check_potential_pair = function(db,pep,num_dimethyl,callback) {
 		pep.has_pair = validated_quans[pep.QuanResultID];
 		callback();
 		return;
+	}
+	if (pep.Sequence.indexOf('K') < 0 ) {
+		num_dimethyl = 1;
 	}
 	if ( ! num_dimethyl ) {
 		find_dimethyls(db,pep,callback);
@@ -145,28 +174,32 @@ var combine_peptides = function(peps) {
 var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(err) {
 	var to_validate = [];
 	var validated = [];
-	db.all(sql_string,function(err,peps) {
-		console.log("Retrieved peptides to search: "+(peps.length)+" total peptides");
-		singlet_peps = combine_peptides(peps).filter(function(pep) {
-			return pep.QuanChannelID.length == 1;
-		});
-		singlet_peps.forEach(function(pep) {
-			check_potential_pair(db,pep,null,function(masses) {
-				if (pep.has_pair) {
-					if (to_validate.indexOf(pep.QuanResultID) < 0) {
-						to_validate.push(pep.QuanResultID);
-						console.log(pep);
-					}
-					console.log("Need to validate "+to_validate.length);
-				} else {
-					if (validated.indexOf(pep.QuanResultID) < 0) {
-						validated.push(pep.QuanResultID);
-					}
-					console.log("Now validated "+validated.length);
-				}
+
+	find_dimethyls(db,{'PeptideID': 0},function() {
+		console.log("Searching Peptides");
+		db.all(sql_string,function(err,peps) {
+			console.log("Retrieved peptides to search: "+(peps.length)+" total peptides");
+			singlet_peps = combine_peptides(peps).filter(function(pep) {
+				return pep.QuanChannelID.length == 1;
 			});
+			singlet_peps.forEach(function(pep) {
+				check_potential_pair(db,pep,null,function(masses) {
+					if (pep.has_pair) {
+						if (to_validate.indexOf(pep.QuanResultID) < 0) {
+							to_validate.push(pep.QuanResultID);
+							console.log(pep);
+						}
+						console.log("Need to validate "+to_validate.length);
+					} else {
+						if (validated.indexOf(pep.QuanResultID) < 0) {
+							validated.push(pep.QuanResultID);
+						}
+						console.log("Now validated "+validated.length);
+					}
+				});
+			});
+			// console.log(arguments);
 		});
-		// console.log(arguments);
 	});
 
 
