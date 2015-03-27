@@ -73,81 +73,89 @@ WHERE (ModificationName = "Dimethyl" OR ModificationName = "Dimethyl:2H(4)") GRO
 
 var dimethyl_count_cache = null;
 
-var find_dimethyls = function(db,pep,callback) {
-	if (! dimethyl_count_cache ) {
-		dimethyl_count_cache = {};
-		console.log("Populating Dimethyl cache");
-		db.all(dimethyl_counts,[],function(err,data) {
+var find_dimethyls = function(db,pep) {
+	return new Promise(function(resolve,reject) {
+
+		if (! dimethyl_count_cache ) {
+
 			dimethyl_count_cache = {};
-			data.forEach(function(count) {
-				dimethyl_count_cache[count.PeptideID] = count.count;
-			});
-			setTimeout(function() {
+			console.log("Populating Dimethyl cache");
+
+			db.all(dimethyl_counts,[]).then(function(data) {
+				dimethyl_count_cache = {};
+				data.forEach(function(count) {
+					dimethyl_count_cache[count.PeptideID] = count.count;
+				});
 				console.log("Populated Dimethyl cache");
-				find_dimethyls(db,pep,callback);
+
 				if ( ! pep.QuanResultID ) {
-					callback();
+					resolve();
+				} else {
+					resolve(find_dimethyls(db,pep));
 				}
-			},0);
-		});
-		return;
-	}
-	setTimeout(function() {
-		check_potential_pair(db,pep,dimethyl_count_cache[pep.PeptideID],callback);
-	},0);
+			},reject);
+
+		} else {
+			resolve(dimethyl_count_cache[pep.PeptideID]);
+			// return check_potential_pair(db,pep,dimethyl_count_cache[pep.PeptideID]);
+		}
+	});
 };
 
 
 
 var validated_quans = {};
 
-var check_potential_pair = function(db,pep,num_dimethyl,callback) {
-	if (! pep.QuanResultID) {
-		return;
-	}
-	if (pep.QuanResultID in validated_quans) {
-		pep.has_pair = validated_quans[pep.QuanResultID];
-		callback();
-		return;
-	}
-	if (pep.Sequence.indexOf('K') < 0 ) {
-		num_dimethyl = 1;
-	}
-	if ( ! num_dimethyl ) {
-		find_dimethyls(db,pep,callback);
-		return;
-	}
-	pep.has_pair = false;
-	var mass_change_dir = 1;
-	if (pep.QuanChannelID.indexOf(2) >= 0) {
-		mass_change_dir = -1;
-	}
-	db.all(related_quants,[ pep.QuanResultID ],function(err,events) {
-		var events_length = events.length;
-		events.forEach(function(ev) {
-			events_length -= 1;
-			if (pep.has_pair) {
-				if (events_length <= 0) {
-					validated_quans[pep.QuanResultID] = pep.has_pair;
-					callback();
+var check_potential_pair = function(db,pep,num_dimethyl) {
+	return new Promise(function(resolve,reject) {
+		if (! pep.QuanResultID) {
+			resolve();
+			return;
+		}
+		if (pep.QuanResultID in validated_quans) {
+			pep.has_pair = validated_quans[pep.QuanResultID];
+			resolve();
+			return;
+		}
+		if (pep.Sequence.indexOf('K') < 0 ) {
+			num_dimethyl = 1;
+		}
+		if ( ! num_dimethyl ) {
+			find_dimethyls(db,pep).then(function(count) {
+				resolve(check_potential_pair(db,pep,count));
+			},reject);
+			return;
+		}
+		pep.has_pair = false;
+		var mass_change_dir = 1;
+		if (pep.QuanChannelID.indexOf(2) >= 0) {
+			mass_change_dir = -1;
+		}
+
+		db.all(related_quants,[ pep.QuanResultID ]).then(function(events) {
+			var events_length = events.length;
+			events.forEach(function(ev) {
+				events_length -= 1;
+				if (pep.has_pair) {
+					if (events_length <= 0) {
+						validated_quans[pep.QuanResultID] = pep.has_pair;
+						resolve();
+					}
+					return;
 				}
-				return;
-			}
-			var target_mass = ev.Mass + (mass_change_dir * num_dimethyl * (32.056407-28.0313)/ev.Charge);
-			// console.log(ev.Mass);
-			// console.log(ev.Charge);
-			// console.log(pep.QuanChannelID);
-			// console.log(target_mass);
-			db.all(search_pair_sql, [ ev.FileID, ev.LeftRT - 0.05, ev.RightRT + 0.05, target_mass*(1 - 15/1000000) , target_mass*(1 + 15/1000000)],function(err,rows) {
-				if (rows && rows.length > 0) {
-					pep.has_pair = true;	
-				}
-				if (events_length <= 0) {
-					validated_quans[pep.QuanResultID] = pep.has_pair;
-					callback();
-				}
+				var target_mass = ev.Mass + (mass_change_dir * num_dimethyl * (32.056407-28.0313)/ev.Charge);
+
+				db.all(search_pair_sql, [ ev.FileID, ev.LeftRT - 0.05, ev.RightRT + 0.05, target_mass*(1 - 15/1000000) , target_mass*(1 + 15/1000000)]).then(function(rows) {
+					if (rows && rows.length > 0) {
+						pep.has_pair = true;
+					}
+					if (events_length <= 0) {
+						validated_quans[pep.QuanResultID] = pep.has_pair;
+						resolve();
+					}
+				}).catch(reject);
 			});
-		});
+		}).catch(reject);
 	});
 };
 
@@ -171,34 +179,74 @@ var combine_peptides = function(peps) {
 	return Object.keys(all_peps).map(function(key) { return all_peps[key]; });
 };
 
+
+var onlyUnique = function(value, index, self) {
+    return self.indexOf(value) === index;
+};
+
+var promisify = function(db) {
+	var old_all = db.all;
+	db.all = function(sql,vals) {
+		var args = Array.prototype.splice.call(arguments);
+		return new Promise(function(resolve,reject) {
+			old_all.call(db,sql,vals,function(err,vals) {
+				if (err) {
+					reject(err);
+				} else {
+					resolve(vals);
+				}
+			});
+		});
+	};
+}
+
 var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(err) {
 	var to_validate = [];
 	var validated = [];
+	promisify(db);
 
-	find_dimethyls(db,{'PeptideID': 0},function() {
+	find_dimethyls(db,{'PeptideID': 0}).then(function() {
 		console.log("Searching Peptides");
-		db.all(sql_string,function(err,peps) {
+		db.all(sql_string).then(function(peps) {
 			console.log("Retrieved peptides to search: "+(peps.length)+" total peptides");
-			singlet_peps = combine_peptides(peps).filter(function(pep) {
-				return pep.QuanChannelID.length == 1;
-			});
-			singlet_peps.forEach(function(pep) {
-				check_potential_pair(db,pep,null,function(masses) {
-					if (pep.has_pair) {
-						if (to_validate.indexOf(pep.QuanResultID) < 0) {
-							to_validate.push(pep.QuanResultID);
-							console.log(pep);
-						}
-						console.log("Need to validate "+to_validate.length);
+			var valid_quants = 0;
+			var unquantified = 0;
+			var combined_peps = combine_peptides(peps);
+			singlet_peps = combined_peps.filter(function(pep) {
+				var is_singlet = pep.QuanChannelID.filter(onlyUnique).length == 1;
+				if ( ! is_singlet ) {
+					if ( pep.QuanChannelID.length > 0 ){
+						valid_quants+=1;
 					} else {
-						if (validated.indexOf(pep.QuanResultID) < 0) {
-							validated.push(pep.QuanResultID);
-						}
-						console.log("Now validated "+validated.length);
+						unquantified += 1;
 					}
-				});
+				}
+				return is_singlet;
 			});
-			// console.log(arguments);
+			console.log("We have "+valid_quants + " valid quantifications");
+			console.log("We have "+unquantified + " unquantified");
+			var pair_promises = singlet_peps.map(
+				function(pep) {
+					return check_potential_pair(db,pep,null);
+				});
+			Promise.all(pair_promises).then(function() {
+				console.log("Done");
+				console.log( combined_peps.filter(function(pep) { return pep.QuanChannelID.length == 2; }) );
+			}, function() { console.log("Rejected"); });
+				// function(masses) {
+				// 	if (pep.has_pair) {
+				// 		if (to_validate.indexOf(pep.QuanResultID) < 0) {
+				// 			to_validate.push(pep.QuanResultID);
+				// 			console.log(pep);
+				// 		}
+				// 		console.log("Need to validate "+to_validate.length);
+				// 	} else {
+				// 		if (validated.indexOf(pep.QuanResultID) < 0) {
+				// 			validated.push(pep.QuanResultID);
+				// 		}
+				// 		console.log("Now validated "+validated.length);
+				// 	}
+				// });
 		});
 	});
 
