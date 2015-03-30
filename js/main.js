@@ -10,7 +10,6 @@ var fs 		= require('fs'),
 
 var current_files = [];
 nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).overrides( require('optimist')(gui.App.argv).argv );
-console.log(nconf.get());
 
 if (nconf.get('MS_DEBUG') || nconf.get('debug')) {
 	gui.Window.get().showDevTools();
@@ -21,7 +20,42 @@ if (files_to_open.length < 1) {
 	document.getElementById('fileDialog').click();
 }
 
-var sql_string = 'SELECT \
+var promisify_sqlite = function(db) {
+	var old_all = db.all;
+	db.all = function(sql,vals) {
+		var args = Array.prototype.splice.call(arguments);
+		return new Promise(function(resolve,reject) {
+			old_all.call(db,sql,vals,function(err,vals) {
+				if (err) {
+					reject(err);
+				} else {
+					resolve(vals);
+				}
+			});
+		});
+	};
+	var cached_statements = {};
+	db.do_statement = function(sql,vals) {
+		if ( ! cached_statements[sql]) {
+			cached_statements[sql] = db.prepare(sql);
+		}
+		return new Promise(function(resolve,reject) {
+			cached_statements[sql].all.apply( cached_statements[sql], vals.concat( function(err,vals) {
+				if (err) {
+					reject(err);
+				} else {
+					resolve(vals);
+				}
+			}));
+		});
+	};
+	db.end_statement = function(sql) {
+		cached_statements[sql].finalize();
+		delete cached_statements[sql];
+	};
+};
+
+const search_peptides_sql = 'SELECT \
 	peptides.PeptideID, \
 	peptides.UniquePeptideSequenceID, \
 	peptides.SpectrumID, \
@@ -42,7 +76,7 @@ AND peptides.PeptideID in (SELECT distinct PeptideID \
 		WHERE ModificationName like "%Hex%") \
 	)';
 
-var related_quants = 'SELECT \
+const related_quants_sql = 'SELECT \
 	EventID, \
 	FileID, \
 	Mass, \
@@ -54,7 +88,7 @@ FROM EventAnnotations \
 	JOIN Events USING(EventID) \
 WHERE QuanResultID = ?';
 
-var search_pair_sql = 'SELECT \
+const search_pair_sql = 'SELECT \
 	* \
 FROM Events \
 WHERE 	FileID = ? AND \
@@ -64,12 +98,38 @@ WHERE 	FileID = ? AND \
 		Mass <= ? \
 ';
 
-var dimethyl_counts = 'SELECT \
+const dimethyl_counts_sql = 'SELECT \
 	count(distinct Position) as count, PeptideID \
 FROM PeptidesAminoAcidModifications \
 	JOIN AminoAcidModifications USING(AminoAcidModificationID) \
 WHERE (ModificationName = "Dimethyl" OR ModificationName = "Dimethyl:2H(4)") GROUP BY PeptideID';
 
+
+const peptide_metadata_sql = 'SELECT \
+	Description \
+FROM Peptides \
+	LEFT JOIN PeptidesProteins USING(PeptideID) \
+	LEFT JOIN ProteinAnnotations USING (ProteinID) \
+WHERE Peptides.PeptideID = ?';
+
+// const peptide_modification_sql = 'SELECT \
+// 	Position, ModificationName \
+// FROM PeptidesAminoAcidModifications \
+// 	LEFT JOIN AminoAcidModifications USING (AminoAcidModificationID) \
+// WHERE PeptideID = ?';
+
+const peptide_modification_sql = 'SELECT \
+	Position,AminoAcidModificationID \
+FROM PeptidesAminoAcidModifications \
+WHERE PeptideID = ?';
+
+const all_peptide_modifications_sql = 'SELECT \
+	PeptideID, Position, ModificationName \
+FROM PeptidesAminoAcidModifications \
+	LEFT JOIN AminoAcidModifications USING (AminoAcidModificationID)';
+
+const MASS_MEDIUM = 32.056407;
+const MASS_LIGHT = 28.0313;
 
 var dimethyl_count_cache = null;
 
@@ -81,7 +141,7 @@ var find_dimethyls = function(db,pep) {
 			dimethyl_count_cache = {};
 			console.log("Populating Dimethyl cache");
 
-			db.all(dimethyl_counts,[]).then(function(data) {
+			db.all(dimethyl_counts_sql,[]).then(function(data) {
 				dimethyl_count_cache = {};
 				data.forEach(function(count) {
 					dimethyl_count_cache[count.PeptideID] = count.count;
@@ -103,8 +163,7 @@ var find_dimethyls = function(db,pep) {
 };
 
 
-
-var validated_quans = {};
+var validated_quans_cache = {};
 
 var check_potential_pair = function(db,pep,num_dimethyl) {
 	return new Promise(function(resolve,reject) {
@@ -112,8 +171,8 @@ var check_potential_pair = function(db,pep,num_dimethyl) {
 			resolve();
 			return;
 		}
-		if (pep.QuanResultID in validated_quans) {
-			pep.has_pair = validated_quans[pep.QuanResultID];
+		if (pep.QuanResultID in validated_quans_cache) {
+			pep.has_pair = validated_quans_cache[pep.QuanResultID];
 			resolve();
 			return;
 		}
@@ -126,36 +185,91 @@ var check_potential_pair = function(db,pep,num_dimethyl) {
 			},reject);
 			return;
 		}
+
 		pep.has_pair = false;
+
 		var mass_change_dir = 1;
+
 		if (pep.QuanChannelID.indexOf(2) >= 0) {
 			mass_change_dir = -1;
 		}
 
-		db.all(related_quants,[ pep.QuanResultID ]).then(function(events) {
+		db.all(related_quants_sql,[ pep.QuanResultID ]).then(function(events) {
 			var events_length = events.length;
 			events.forEach(function(ev) {
 				events_length -= 1;
 				if (pep.has_pair) {
 					if (events_length <= 0) {
-						validated_quans[pep.QuanResultID] = pep.has_pair;
+						validated_quans_cache[pep.QuanResultID] = pep.has_pair;
 						resolve();
 					}
 					return;
 				}
-				var target_mass = ev.Mass + (mass_change_dir * num_dimethyl * (32.056407-28.0313)/ev.Charge);
+				var target_mass = ev.Mass + (mass_change_dir * num_dimethyl * (MASS_MEDIUM-MASS_LIGHT)/ev.Charge);
 
 				db.all(search_pair_sql, [ ev.FileID, ev.LeftRT - 0.05, ev.RightRT + 0.05, target_mass*(1 - 15/1000000) , target_mass*(1 + 15/1000000)]).then(function(rows) {
 					if (rows && rows.length > 0) {
 						pep.has_pair = true;
 					}
 					if (events_length <= 0) {
-						validated_quans[pep.QuanResultID] = pep.has_pair;
+						validated_quans_cache[pep.QuanResultID] = pep.has_pair;
 						resolve();
 					}
 				}).catch(reject);
 			});
 		}).catch(reject);
+	});
+};
+
+var pep_calls = 0;
+
+var produce_peptide_data = function(db,pep) {
+	return db.do_statement(peptide_metadata_sql, [ pep.PeptideID ]).then(function(pep_datas) {
+		pep_calls++;
+		if ((pep_calls % 100) == 0) {
+			console.log(pep_calls);
+		}
+		if ( ! pep.uniprot ) {
+			pep.uniprot = [];
+		}
+		pep_datas.forEach(function(pep_data) {
+			var uniprot = pep_data.Description.split('|')[1];
+			if (pep.uniprot.indexOf(uniprot) < 0) {
+				pep.uniprot.push(uniprot);
+			}
+		});
+	});
+};
+
+var peptide_modifications_cache = null;
+
+var produce_peptide_modification_data = function(db,pep) {
+	return new Promise(function(resolve,reject) {
+
+		if (! peptide_modifications_cache ) {
+
+			peptide_modifications_cache = {};
+			console.log("Populating Modifications cache");
+
+			db.all(all_peptide_modifications_sql,[]).then(function(data) {
+				peptide_modifications_cache = {};
+				data.forEach(function(mods) {
+					peptide_modifications_cache[mods.PeptideID] =  peptide_modifications_cache[mods.PeptideID] || [];
+					peptide_modifications_cache[mods.PeptideID].push([ mods.Position + 1, mods.ModificationName ]);
+				});
+				console.log("Populated Modifications cache");
+
+				if ( ! pep.PeptideID ) {
+					resolve();
+				} else {
+					resolve(produce_peptide_modification_data(db,pep));
+				}
+			},reject);
+
+		} else {
+			pep.modifications = (peptide_modifications_cache[pep.PeptideID] || []).filter( function(mod) { return (mod[1] || '').indexOf('Hex') >= 0 } ).map( function(mod) { return mod } );
+			resolve();
+		}
 	});
 };
 
@@ -184,72 +298,31 @@ var onlyUnique = function(value, index, self) {
     return self.indexOf(value) === index;
 };
 
-var promisify = function(db) {
-	var old_all = db.all;
-	db.all = function(sql,vals) {
-		var args = Array.prototype.splice.call(arguments);
-		return new Promise(function(resolve,reject) {
-			old_all.call(db,sql,vals,function(err,vals) {
-				if (err) {
-					reject(err);
-				} else {
-					resolve(vals);
-				}
-			});
-		});
-	};
-}
+var global_results;
 
 var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(err) {
-	var to_validate = [];
-	var validated = [];
-	promisify(db);
 
-	find_dimethyls(db,{'PeptideID': 0}).then(function() {
+	promisify_sqlite(db);
+	produce_peptide_modification_data(db,{}).then(function() { return find_dimethyls(db,{'PeptideID': 0}); }).then(function() {
 		console.log("Searching Peptides");
-		db.all(sql_string).then(function(peps) {
+		db.all(search_peptides_sql).then(function(peps) {
 			console.log("Retrieved peptides to search: "+(peps.length)+" total peptides");
-			var valid_quants = 0;
-			var unquantified = 0;
+
 			var combined_peps = combine_peptides(peps);
-			singlet_peps = combined_peps.filter(function(pep) {
-				var is_singlet = pep.QuanChannelID.filter(onlyUnique).length == 1;
-				if ( ! is_singlet ) {
-					if ( pep.QuanChannelID.length > 0 ){
-						valid_quants+=1;
-					} else {
-						unquantified += 1;
-					}
-				}
-				return is_singlet;
-			});
-			console.log("We have "+valid_quants + " valid quantifications");
-			console.log("We have "+unquantified + " unquantified");
-			var pair_promises = singlet_peps.map(
-				function(pep) {
-					return check_potential_pair(db,pep,null);
-				});
-			Promise.all(pair_promises).then(function() {
+
+			var singlet_peps = combined_peps.filter( function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; } );
+
+			var pair_promises = singlet_peps.map( function(pep) { return check_potential_pair(db,pep,null); } );
+
+			var metadata_promises = combined_peps.map( function(pep) { return produce_peptide_data(db,pep).then( produce_peptide_modification_data(db,pep) );  } );
+
+			Promise.all(pair_promises.concat(metadata_promises)).then(function() {
+				db.end_statement(peptide_metadata_sql);
 				console.log("Done");
-				console.log( combined_peps.filter(function(pep) { return pep.QuanChannelID.length == 2; }) );
+				global_results = combined_peps; //combined_peps.filter(function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; }) );
 			}, function() { console.log("Rejected"); });
-				// function(masses) {
-				// 	if (pep.has_pair) {
-				// 		if (to_validate.indexOf(pep.QuanResultID) < 0) {
-				// 			to_validate.push(pep.QuanResultID);
-				// 			console.log(pep);
-				// 		}
-				// 		console.log("Need to validate "+to_validate.length);
-				// 	} else {
-				// 		if (validated.indexOf(pep.QuanResultID) < 0) {
-				// 			validated.push(pep.QuanResultID);
-				// 		}
-				// 		console.log("Now validated "+validated.length);
-				// 	}
-				// });
 		});
 	});
-
 
 
 	// Area is the sum of Areas for the Events associated with the QuanResultID (from EventAnnotations)
