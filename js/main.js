@@ -79,6 +79,13 @@ AND peptides.PeptideID in (SELECT distinct PeptideID \
 		WHERE ModificationName like "%Hex%") \
 	)';
 
+/*
+	We also want to get the subtracted HCD data. We can look at each of the FileNames, and then
+	extract out all the MassPeaks (and so Spectra and Peptides) that are associated with each of
+	the different filenames, and then assign the ambiguous mass difference to each of the
+	peptides.
+*/
+
 const related_quants_sql = 'SELECT \
 	EventID, \
 	FileID, \
