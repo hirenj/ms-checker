@@ -3,7 +3,10 @@ var gui = require('nw.gui');
 
 var fs 		= require('fs'),
 	nconf	= require('nconf'),
-	sqlite3 = require('sqlite3');
+	sqlite3 = require('sqlite3'),
+	yauzl	= require('yauzl'),
+	sax	= require('sax'),
+	saxpath = require('saxpath');
 
 
 
@@ -128,6 +131,12 @@ const all_peptide_modifications_sql = 'SELECT \
 FROM PeptidesAminoAcidModifications \
 	LEFT JOIN AminoAcidModifications USING (AminoAcidModificationID)';
 
+const retrieve_spectrum_sql = 'SELECT \
+	Spectrum \
+FROM SpectrumHeaders \
+	LEFT JOIN Spectra USING (UniqueSpectrumID) \
+WHERE SpectrumID = ?';
+
 const MASS_MEDIUM = 32.056407;
 const MASS_LIGHT = 28.0313;
 
@@ -144,7 +153,7 @@ var find_dimethyls = function(db,pep) {
 			db.all(dimethyl_counts_sql,[]).then(function(data) {
 				dimethyl_count_cache = {};
 				data.forEach(function(count) {
-					dimethyl_count_cache[count.PeptideID] = count.count;
+					dimethyl_count_cache[count.PeptideID] = count.count+1;
 				});
 				console.log("Populated Dimethyl cache");
 
@@ -206,10 +215,16 @@ var check_potential_pair = function(db,pep,num_dimethyl) {
 					return;
 				}
 				var target_mass = ev.Mass + (mass_change_dir * num_dimethyl * (MASS_MEDIUM-MASS_LIGHT)/ev.Charge);
-
 				db.all(search_pair_sql, [ ev.FileID, ev.LeftRT - 0.05, ev.RightRT + 0.05, target_mass*(1 - 15/1000000) , target_mass*(1 + 15/1000000)]).then(function(rows) {
 					if (rows && rows.length > 0) {
 						pep.has_pair = true;
+						if (nconf.get('MS_DEBUG') || nconf.get('debug')) {
+							pep.matching_events = rows.map(function(row) { return row.EventID; });
+							pep.search_event = ev.EventID;
+							pep.target_mass = target_mass;
+							pep.num_dimethyl = num_dimethyl;
+							pep.mass_change_dir = mass_change_dir;
+						}
 					}
 					if (events_length <= 0) {
 						validated_quans_cache[pep.QuanResultID] = pep.has_pair;
@@ -293,6 +308,44 @@ var combine_peptides = function(peps) {
 	return Object.keys(all_peps).map(function(key) { return all_peps[key]; });
 };
 
+var check_spectrum = function(db,pep) {
+
+	var saxParser = sax.createStream(true)
+	var streamer = new saxpath.SaXPath(saxParser, '//PeakCentroids/Peak');
+	var streamer2 = new saxpath.SaXPath(saxParser, '//ScanEvent/ActivationTypes');
+
+	streamer.on('match', function(xml) {
+		// Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
+		// if it is within 0.4 - 0.6, it is a GalNAc, 2.0 or greater, GlcNAc
+	    console.log(xml);
+	});
+
+	streamer2.on('match', function(xml) {
+		// Check that we're matching a HCD spectrum here
+	    console.log(xml);
+	});
+
+	return db.all(retrieve_spectrum_sql, [ pep.SpectrumID ]).then(function(spectra) {
+		var spectrum = spectra[0].Spectrum;
+
+		yauzl.fromBuffer(spectrum, function(err, zipfile) {
+
+		  if (err) throw err;
+
+		  zipfile.on("entry", function(entry) {
+		    if (/\/$/.test(entry.fileName)) {
+		      // directory file names end with '/'
+		      return;
+		    }
+		    zipfile.openReadStream(entry, function(err, readStream) {
+		      if (err) throw err;
+		      readStream.pipe(saxParser);
+		    });
+		  });
+		});
+	});
+};
+
 
 var onlyUnique = function(value, index, self) {
     return self.indexOf(value) === index;
@@ -320,6 +373,7 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
 				db.end_statement(peptide_metadata_sql);
 				console.log("Done");
 				global_results = combined_peps; //combined_peps.filter(function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; }) );
+				global_db = db;
 			}, function() { console.log("Rejected"); });
 		});
 	});
