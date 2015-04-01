@@ -144,6 +144,25 @@ FROM SpectrumHeaders \
 	LEFT JOIN Spectra USING (UniqueSpectrumID) \
 WHERE SpectrumID = ?';
 
+
+const retrieve_ambiguous_peptides_sql = 'SELECT \
+	Peptides.PeptideID, Peptides.SpectrumID, Peptides.Sequence, FileInfos.Filename \
+FROM FileInfos \
+	LEFT JOIN MassPeaks USING(FileID) \
+	LEFT JOIN SpectrumHeaders USING(MassPeakID) \
+	JOIN Peptides using(SpectrumID) \
+	WHERE \
+		(	FileInfos.FileName LIKE "%xGalNAc%" \
+		OR \
+			FileInfos.FileName LIKE "%xHexNAc%" \
+		OR \
+			FileInfos.FileName LIKE "%Hex%" \
+		OR \
+			FileInfos.FileName LIKE "%Man%" \
+		) \
+	AND \
+		Peptides.ConfidenceLevel = 3';
+
 const MASS_MEDIUM = 32.056407;
 const MASS_LIGHT = 28.0313;
 
@@ -295,7 +314,11 @@ var produce_peptide_modification_data = function(db,pep) {
 	});
 };
 
-var combine_peptides = function(peps) {
+var init_caches = function(db) {
+	return produce_peptide_modification_data(db,{}).then(function() { return find_dimethyls(db,{'PeptideID': 0}); });
+};
+
+var combine_quantified_peptides = function(peps) {
 	var all_peps = {};
 	peps.forEach(function(pep) {
 		var curr_pep = all_peps[pep.PeptideID] ||  pep;
@@ -313,6 +336,26 @@ var combine_peptides = function(peps) {
 		all_peps[pep.PeptideID] = curr_pep;
 	});
 	return Object.keys(all_peps).map(function(key) { return all_peps[key]; });
+};
+
+var retrieve_quantified_peptides = function(db) {
+	return db.all(search_peptides_sql);
+};
+
+var check_quantified_peptides = function(db,peps) {
+	console.log("Retrieved peptides to search: "+(peps.length)+" total peptides");
+
+	var combined_peps = combine_quantified_peptides(peps);
+
+	var singlet_peps = combined_peps.filter( function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; } );
+
+	var pair_promises = singlet_peps.map( function(pep) { return check_potential_pair(db,pep,null); } );
+
+	var metadata_promises = combined_peps.map( function(pep) { return produce_peptide_data(db,pep).then( produce_peptide_modification_data(db,pep) );  } );
+
+	return Promise.all(pair_promises.concat(metadata_promises)).then(function() {
+		return combined_peps;
+	});
 };
 
 var check_spectrum = function(db,pep) {
@@ -353,6 +396,26 @@ var check_spectrum = function(db,pep) {
 	});
 };
 
+var retrieve_ambiguous_peptides = function(db) {
+	return db.all(retrieve_ambiguous_peptides_sql).then(function(peps) {
+		return Promise.all( peps.map(function(pep) { return produce_peptide_data(db,pep); }) ).then(function() {
+			peps.forEach(function(pep) {
+				var composition = (pep.FileName || "").match(/\d+\x.+(?=\.mgf)/);
+				if ( composition ) {
+					pep.Composition = composition.map(function(comp) { return comp.toString(); });
+				}
+				delete pep.FileName;
+			});
+			return peps;
+		});
+	} );
+};
+
+
+var partial = function(fn) {
+	var args = Array.prototype.slice.call(arguments, 1);
+	return function() { return fn.apply(this, args.concat(Array.prototype.slice.call(arguments, 0))); };
+};
 
 var onlyUnique = function(value, index, self) {
     return self.indexOf(value) === index;
@@ -363,96 +426,21 @@ var global_results;
 var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(err) {
 
 	promisify_sqlite(db);
-	produce_peptide_modification_data(db,{}).then(function() { return find_dimethyls(db,{'PeptideID': 0}); }).then(function() {
+	init_caches(db).then(function() {
 		console.log("Searching Peptides");
-		db.all(search_peptides_sql).then(function(peps) {
-			console.log("Retrieved peptides to search: "+(peps.length)+" total peptides");
 
-			var combined_peps = combine_peptides(peps);
+		// Area is the sum of Areas for the Events asociated with the QuanResultID (from EventAnnotations)
+		retrieve_quantified_peptides(db).then(partial(check_quantified_peptides,db)).then(function(peps) {
+			db.end_statement(peptide_metadata_sql);
+			console.log("Done");
+			global_results = peps; //combined_peps.filter(function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; }) );
+			global_db = db;
+		}).then(partial(retrieve_ambiguous_peptides,db)).then(function(peps) {
+			console.log("Done ambiguous peptides");
+			global_results = global_results.concat(peps);
+		}).catch(function(err) { console.log(arguments); console.log("Rejected"); });
 
-			var singlet_peps = combined_peps.filter( function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; } );
-
-			var pair_promises = singlet_peps.map( function(pep) { return check_potential_pair(db,pep,null); } );
-
-			var metadata_promises = combined_peps.map( function(pep) { return produce_peptide_data(db,pep).then( produce_peptide_modification_data(db,pep) );  } );
-
-			Promise.all(pair_promises.concat(metadata_promises)).then(function() {
-				db.end_statement(peptide_metadata_sql);
-				console.log("Done");
-				global_results = combined_peps; //combined_peps.filter(function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; }) );
-				global_db = db;
-			}, function() { console.log("Rejected"); });
-		});
 	});
 
-
-	// Area is the sum of Areas for the Events associated with the QuanResultID (from EventAnnotations)
-
-	// select PeptideId,SpectrumID from peptides where peptides.ConfidenceLevel = 3
-
-	// select QuanResultID, SearchSpectrumID from PrecursorIonQuanResultsSearchSpectra where SearchSpectrumID = ?
-
-	// select * from PrecursorIonQuanResults where QuanResultID = ?
-
-	// We want to search:
-	//  This looks like this is all the spectra that were used to search for an area
-	//	PrecursorIonAreaSearchSpectra
-
-
-	//  This is just the search spectra where an area was able to be obtained.
-	//	PrecursorIonQuanResults	
-	//	PrecursorIonQuanResultsSearchSpectra
-	//  We want to look at the SearchSpectrumID to get the Peptide / Spectrum link
-
-	// CREATE TABLE [PrecursorIonQuanResults] (
-	// 	[QuanChannelID][int] NOT NULL,
-	// 	[QuanResultID][int] NOT NULL,
-	// 	[Mass] [double] NOT NULL ,
-	// 	[Charge] [int] NOT NULL ,
-	// 	[Area] [double] NULL ,
-	// 	[RetentionTime] [double] NULL
-	// );
-	// CREATE TABLE [PrecursorIonQuanResultsSearchSpectra] (
-	// 	[ProcessingNodeNumber] [int] NOT NULL ,
-	// 	[QuanResultID] [int] NOT NULL ,
-	// 	[SearchSpectrumID] [int] NULL 
-	// );
-
-	// CREATE TABLE [Peptides] (	
-	// 	[ProcessingNodeNumber] [int] NOT NULL ,
-	// 	[PeptideID] [int] NOT NULL ,
-	// 	[SpectrumID] [int] NOT NULL ,
-	// 	[TotalIonsCount] [smallint] NOT NULL ,
-	// 	[MatchedIonsCount] [smallint] NOT NULL ,
-	// 	[ConfidenceLevel] [smallint] NOT NULL ,
-	// 	[SearchEngineRank] [int] NOT NULL,
-	// 	[Hidden] [bit] DEFAULT 0 NOT NULL ,
-	// 	[Sequence] [varchar] (1024) COLLATE NOCASE NULL,	
-	// 	[Annotation] [varchar] (1024) COLLATE NOCASE NULL ,
-	// 	[UniquePeptideSequenceID] [int] DEFAULT 1 NOT NULL,
-	// 	[MissedCleavages] [smallint] NOT NULL,
-	// 	PRIMARY KEY (		
-	// 		[ProcessingNodeNumber],
-	// 		[PeptideID] 
-	// 	)
-	// );
-
-	// EventAnnotations and EventAreaAnnotations should provide the link
-	// between the EventID and QuanResultID for a peptide
-
-	// CREATE TABLE [EventAnnotations] (
-	// 	[EventID] INTEGER PRIMARY KEY NOT NULL,
-	// 	[Charge] [smallint] NOT NULL,									 
-	// 	[IsotopePatternID] [int] NOT NULL,
-	// 	[QuanResultID] [int] NOT NULL,
-	// 	[QuanChannelID] [int] NOT NULL
-	// );
-
-	// CREATE TABLE [EventAreaAnnotations] (
-	// 	[EventID] INTEGER PRIMARY KEY NOT NULL,
-	// 	[Charge] [smallint] NOT NULL,									 
-	// 	[IsotopePatternID] [int] NOT NULL,
-	// 	[QuanResultID] [int] NOT NULL
-	// );
 
 });
