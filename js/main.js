@@ -531,6 +531,99 @@ var retrieve_ambiguous_peptides = function(db) {
     } );
 };
 
+var modification_key = function(pep) {
+    var mod_key = null;
+    if (pep.modifications) {
+        mod_key = pep.modifications.sort(function(a,b) { return a[0] - b[0]; }).map(function(mod) {  return mod[0]+"-"+mod[1]; }).join(',');
+    }
+    if (pep.Composition) {
+        mod_key = pep.Composition.join(',');
+    }
+    return mod_key;
+};
+
+var median = function(values) {
+
+    values.sort( function(a,b) {return a - b;} );
+
+    var half = Math.floor(values.length/2);
+
+    if(values.length % 2)
+        return values[half];
+    else
+        return (values[half-1] + values[half]) / 2.0;
+}
+
+var combine_all_peptides = function(peps) {
+    var data = {};
+    var peptides_by_spectrum = {};
+    peps.forEach(function(pep) {
+        if ( ! peptides_by_spectrum[pep.SpectrumID]) {
+            peptides_by_spectrum[pep.SpectrumID] = [];
+        }
+        peptides_by_spectrum[pep.SpectrumID].push(pep);
+    });
+
+    // Search by Spectrum ID:
+    // Mark ambiguous peptides - if we have different sets of modifications for each spectrum, we can count that as ambiguous. Maybe mark out the possible amino acids? + total number of sites
+    Object.keys(peptides_by_spectrum).forEach(function(spectrumID) {
+        var peps = peptides_by_spectrum[spectrumID];
+
+        // Do we want to filter out the HCD identifications here?
+
+        var mods = peps.map(function(pep) { return modification_key(pep); }).filter(function(key) { return key.indexOf('-') >= 0; });
+        if (mods.length > 1) {
+            peps.forEach(function(pep) {
+                if ( ! pep.Composition && pep.modifications.length > 0 ) {
+                    // We should be a bit smarter about this, grouping compositions appropriately
+                    pep.Composition =  [ ""+pep.modifications.length + "x" + pep.modifications[0][1] ];
+                }
+                pep.possible_mods = pep.modifications;
+                delete pep.modifications;
+            });
+        }
+    });
+    peptides_by_spectrum = null;
+
+    var grouped_peptides = {};
+    peps.forEach(function(pep) {
+        var pep_key = pep.Sequence+"-"+modification_key(pep);
+        if ( ! grouped_peptides[pep_key] ) {
+            grouped_peptides[pep_key] = [];
+        }
+        grouped_peptides[pep_key].push(pep);
+    });
+
+    // Search by Peptide / (modifications + ambig key)
+    // Combine quantitated peptides - seperating out into ambiguous / unambiguous.
+
+    Object.keys(grouped_peptides).forEach(function(pep_key) {
+        var peps = grouped_peptides[pep_key];
+        var quan_peps = peps.filter(function(pep) { return "QuanResultID" in pep;  });
+        var singlet_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length < 2 && pep.has_pair == false; });
+        var ratioed_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length == 2; });
+        var target_ratio = null;
+        if (ratioed_peps.length > 0) {
+            var seen_quan_result_ids = {};
+            target_ratio = median( ratioed_peps.filter(function(pep) { var seen = pep.QuanResultID in seen_quan_result_ids; seen_quan_result_ids[pep.QuanResultID] = 1; return ! seen; }).map(function(pep) { return pep.areas[1] / pep.areas[0]; }) );
+            singlet_peps.forEach(function(pep) { pep.used = false; });
+            ratioed_peps.forEach(function(pep) { pep.used = true; });
+        } else if (singlet_peps.length > 0)  {
+
+            target_ratio = singlet_peps[0].QuanChannelID[0] == 1 ? 1/100000 : 100000;
+
+            // Check singlet ratios to see that they go in the same direction
+        }
+        if (target_ratio) {
+            quan_peps.forEach(function(pep) { pep.CalculatedRatio = target_ratio; });
+        }
+    });
+
+        // If there is more than one uniprot for the peptide mark out as isoform non-unique
+
+
+};
+
 
 var partial = function(fn) {
     var args = Array.prototype.slice.call(arguments, 1);
@@ -579,6 +672,7 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
             return result;
         }).then(function(peps) {
             console.log("Got all data");
+            combine_all_peptides(peps);
         }).catch(function(err) { console.log(arguments); console.log("Rejected"); });
 
     });
