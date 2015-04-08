@@ -9,7 +9,7 @@ var fs      = require('fs'),
     xml2js = require('xml2js'),
     saxpath = require('saxpath');
 
-
+var heapdump = require('heapdump');
 
 
 var current_files = [];
@@ -143,7 +143,7 @@ const retrieve_spectrum_sql = 'SELECT \
     Spectrum \
 FROM SpectrumHeaders \
     LEFT JOIN Spectra USING (UniqueSpectrumID) \
-WHERE SpectrumID = ?';
+WHERE SpectrumID = ? AND SpectrumHeaders.CreatingProcessingNodeNumber = ?';
 
 
 const retrieve_ambiguous_peptides_sql = 'SELECT \
@@ -163,6 +163,24 @@ FROM FileInfos \
         ) \
     AND \
         Peptides.ConfidenceLevel = 3';
+
+const hcd_processing_node_number_sql = 'SELECT \
+    ProcessingNodeNumber \
+FROM ProcessingNodeParameters \
+WHERE \
+    ParameterName = "ActivationTypeFilter" and ParameterValue = "Is#HCD"';
+
+const child_processing_node_numbers_sql = 'SELECT ProcessingNodeNumber \
+FROM ProcessingNodes \
+WHERE (ProcessingNodeParentNumber LIKE ? \
+    OR ProcessingNodeParentNumber LIKE ? \
+    OR ProcessingNodeParentNumber LIKE ? \
+    OR ProcessingNodeParentNumber = ?) \
+    AND ProcessingNodeNumber IN ( \
+        SELECT \
+            distinct CreatingProcessingNodeNumber \
+        FROM SpectrumHeaders \
+        )';
 
 const MASS_MEDIUM = 32.056407;
 const MASS_LIGHT = 28.0313;
@@ -361,8 +379,52 @@ var check_quantified_peptides = function(db,peps) {
 
 var validated_hcd_cache = {};
 
+var unzip_spectrum = function(spectrum_text) {
+    return new Promise(function(resolve,reject) {
+        yauzl.fromBuffer(spectrum_text, function(err, zipfile) {
 
-var check_spectrum = function(db,pep) {
+            if (err) {
+                reject(err);
+                return;
+            }
+            zipfile.addListener('end',resolve);
+            zipfile.addListener("entry", function(entry) {
+                if (/\/$/.test(entry.fileName)) {
+                    // directory file names end with '/'
+                    return;
+                }
+                zipfile.removeListener('entry',arguments.callee);
+                zipfile.removeListener('end',resolve);
+
+                zipfile.openReadStream(entry, function(err, readStream) {
+                    if (err)  {
+                        reject(err);
+                        return;
+                    }
+                    resolve(readStream);
+                });
+            });
+        });
+    });
+
+};
+
+var is_galnac_mass = function(mz) {
+    var galnac_138 = 138.055;
+    var galnac_168 = 168.066;
+    return ((mz <= galnac_138*(1 + 15/1000000) && mz >= galnac_138*(1 - 15/1000000)) ||
+           (mz <= galnac_168*(1 + 15/1000000) && mz >= galnac_168*(1 - 15/1000000)) );
+};
+
+var is_glcnac_mass = function(mz) {
+    var glcnac_126 = 126.055;
+    var glcnac_144 = 144.065;
+    return ((mz <= glcnac_126*(1 + 15/1000000) && mz >= glcnac_126*(1 - 15/1000000)) ||
+           (mz <= glcnac_144*(1 + 15/1000000) && mz >= glcnac_144*(1 - 15/1000000)) );
+};
+
+
+var parse_spectrum = function(pep,readStream) {
 
 
     if (validated_hcd_cache[pep.SpectrumID]) {
@@ -375,7 +437,7 @@ var check_spectrum = function(db,pep) {
         return true;
     }
 
-    var saxParser = sax.createStream(true)
+    var saxParser = sax.createStream(true);
     var peak_stream = new saxpath.SaXPath(saxParser, '//PeakCentroids/Peak');
     var activation_stream = new saxpath.SaXPath(saxParser, '/MassSpectrum/ScanEvent/ActivationTypes');
 
@@ -393,21 +455,6 @@ var check_spectrum = function(db,pep) {
     var galnac_intensity = null;
     var glcnac_intensity = null;
 
-    var is_galnac_mass = function(mz) {
-        var galnac_138 = 138.055;
-        var galnac_168 = 168.066;
-        return ((mz <= galnac_138*(1 + 15/1000000) && mz >= galnac_138*(1 - 15/1000000)) ||
-               (mz <= galnac_168*(1 + 15/1000000) && mz >= galnac_168*(1 - 15/1000000)) );
-    };
-
-    var is_glcnac_mass = function(mz) {
-        var glcnac_126 = 126.055;
-        var glcnac_144 = 144.065;
-        return ((mz <= glcnac_126*(1 + 15/1000000) && mz >= glcnac_126*(1 - 15/1000000)) ||
-               (mz <= glcnac_144*(1 + 15/1000000) && mz >= glcnac_144*(1 - 15/1000000)) );
-    };
-
-
     peak_stream.on('match', function(xml) {
         // Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
         // if it is within 0.4 - 0.6, it is a GalNAc, 2.0 or greater, GlcNAc
@@ -424,49 +471,48 @@ var check_spectrum = function(db,pep) {
         });
     });
 
-
-    return db.all(retrieve_spectrum_sql, [ pep.SpectrumID ]).then(function(spectra) {
-        var spectrum = spectra[0].Spectrum;
-        return new Promise(function(resolve,reject) {
-            yauzl.fromBuffer(spectrum, function(err, zipfile) {
-
-                if (err) {
-                    reject(err);
-                    return;
-                }
-                zipfile.on('end',resolve);
-                zipfile.on("entry", function(entry) {
-                    if (/\/$/.test(entry.fileName)) {
-                        // directory file names end with '/'
-                        return;
-                    }
-                    zipfile.openReadStream(entry, function(err, readStream) {
-                        if (err) throw err;
-
-                        readStream.on('end', function() {
-
-                            validated_hcd_cache[pep.SpectrumID] = { 'activation' : pep.activation };
-
-                            if (pep.activation == 'HCD') {
-                                pep.galnac_intensity = galnac_intensity;
-                                pep.glcnac_intensity = glcnac_intensity;
-                                var ratio = galnac_intensity / glcnac_intensity;
-                                pep.hexnac_type = (ratio <= 0.95) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'Unknown' );
-                                validated_hcd_cache[pep.SpectrumID].galnac_intensity = galnac_intensity;
-                                validated_hcd_cache[pep.SpectrumID].glcnac_intensity = glcnac_intensity;
-                                validated_hcd_cache[pep.SpectrumID].hexnac_type = pep.hexnac_type;
-                            }
-
-                            resolve();
-                        });
-
-                        readStream.pipe(saxParser);
-
-                    });
-                });
-            });
+    var result = new Promise(function(resolve,reject) {
+        readStream.on('end', function() {
+            validated_hcd_cache[pep.SpectrumID] = { 'activation' : pep.activation };
+            if (pep.activation == 'HCD') {
+                pep.galnac_intensity = galnac_intensity;
+                pep.glcnac_intensity = glcnac_intensity;
+                var ratio = galnac_intensity / glcnac_intensity;
+                pep.hexnac_type = (ratio <= 0.95) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'Unknown' );
+                validated_hcd_cache[pep.SpectrumID].galnac_intensity = galnac_intensity;
+                validated_hcd_cache[pep.SpectrumID].glcnac_intensity = glcnac_intensity;
+                validated_hcd_cache[pep.SpectrumID].hexnac_type = pep.hexnac_type;
+            }
+            resolve();
         });
+    });
 
+    readStream.pipe(saxParser);
+
+    return result;
+};
+
+var init_spectrum_processing_num = function(db) {
+    return db.all(hcd_processing_node_number_sql).then(function(nodes) {
+        if ( ! nodes ) {
+            return;
+        }
+        var processing = nodes[0].ProcessingNodeNumber;
+        return db.all(child_processing_node_numbers_sql,["%,"+processing+",%", "%,"+processing, ""+processing+",%",  processing]).then(function(nodes) {
+            if (nodes) {
+                return nodes[0].ProcessingNodeNumber;
+            }
+        });
+    });
+};
+
+var check_spectrum = function(db,pep,processing_node) {
+    return db.all(retrieve_spectrum_sql, [ pep.SpectrumID, processing_node ]).then(function(spectra) {
+        if (spectra.length == 0) {
+            return;
+        }
+        var spectrum = spectra[0].Spectrum;
+        return unzip_spectrum(spectrum).then(partial(parse_spectrum,pep));
     });
 };
 
@@ -507,15 +553,31 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
         // Area is the sum of Areas for the Events asociated with the QuanResultID (from EventAnnotations)
         retrieve_quantified_peptides(db).then(partial(check_quantified_peptides,db)).then(function(peps) {
             db.end_statement(peptide_metadata_sql);
-            console.log("Done");
+            console.log("Done singlet checking");
             global_results = peps;
         }).then(partial(retrieve_ambiguous_peptides,db)).then(function(peps) {
             console.log("Done ambiguous peptides");
             global_results = global_results.concat(peps);
             return global_results;
         }).then(function(peps) {
-            return Promise.all( peps.map(function(pep) { check_spectrum(db,pep); }) );
-        }).then(function() {
+            var to_cut = [].concat(peps);
+            var processing_node = null;
+            var result = init_spectrum_processing_num(db).then(function(node) {
+                processing_node = node;
+                console.log("We only want spectra from Processing Node ",processing_node);
+                return true;
+            });
+            var split_length = 50;
+            result = result.then(function() {
+                // heapdump.writeSnapshot();
+                console.log("Peps remaining to check : ",to_cut.length);
+                if (to_cut.length > 0) {
+                    return Promise.all(  to_cut.splice(0,split_length).map(function(pep) { return check_spectrum(db,pep,processing_node); }) ).then(arguments.callee);
+                }
+                return peps;
+            });
+            return result;
+        }).then(function(peps) {
             console.log("Got all data");
         }).catch(function(err) { console.log(arguments); console.log("Rejected"); });
 
