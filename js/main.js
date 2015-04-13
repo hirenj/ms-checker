@@ -296,7 +296,7 @@ var produce_peptide_data = function(db,pep) {
         }
         pep_datas.forEach(function(pep_data) {
             var uniprot = pep_data.Description.split('|')[1];
-            if (pep.uniprot.indexOf(uniprot) < 0) {
+            if (uniprot && pep.uniprot.indexOf(uniprot) < 0) {
                 pep.uniprot.push(uniprot);
             }
         });
@@ -658,6 +658,9 @@ var combine_all_peptides = function(peps) {
         }
         if (first_pep.Composition) {
             block.composition = first_pep.Composition;
+        } else if (first_pep.modifications) {
+            var count = 0;
+            block.composition = [first_pep.modifications.map(function(site) { count += 1; return site[1]; })[0], count ].reverse().join('x');
         }
         first_pep.uniprot.forEach(function(uniprot) {
             if ( ! data[uniprot] ) {
