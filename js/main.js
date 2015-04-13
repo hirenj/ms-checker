@@ -54,7 +54,9 @@ var promisify_sqlite = function(db) {
         });
     };
     db.end_statement = function(sql) {
-        cached_statements[sql].finalize();
+        if (cached_statements[sql]) {
+            cached_statements[sql].finalize();
+        }
         delete cached_statements[sql];
     };
 };
@@ -494,12 +496,12 @@ var parse_spectrum = function(pep,readStream) {
 
 var init_spectrum_processing_num = function(db) {
     return db.all(hcd_processing_node_number_sql).then(function(nodes) {
-        if ( ! nodes ) {
+        if ( ! nodes || nodes.length < 1 ) {
             return;
         }
         var processing = nodes[0].ProcessingNodeNumber;
         return db.all(child_processing_node_numbers_sql,["%,"+processing+",%", "%,"+processing, ""+processing+",%",  processing]).then(function(nodes) {
-            if (nodes) {
+            if (nodes && nodes.length > 0) {
                 return nodes[0].ProcessingNodeNumber;
             }
         });
@@ -619,9 +621,52 @@ var combine_all_peptides = function(peps) {
         }
     });
 
-        // If there is more than one uniprot for the peptide mark out as isoform non-unique
-
-
+    Object.keys(grouped_peptides).forEach(function(pep_key) {
+        var peps = grouped_peptides[pep_key];
+        if (peps.length < 1) {
+            return;
+        }
+        var first_pep = peps[0];
+        var quant = null;
+        var hexnac_type = {};
+        peps.forEach(function(pep) {
+            if ("CalculatedRatio" in pep) {
+                quant = pep.CalculatedRatio;
+            }
+            if ("hexnac_type" in pep) {
+                hexnac_type[pep.hexnac_type] = true;
+                if (("GlcNAc" in hexnac_type || "GalNAc" in hexnac_type)) {
+                    delete hexnac_type['Unknown'];
+                }
+            }
+        });
+        var block = {
+            'multi_protein' : false,
+            'sequence' : first_pep.Sequence
+        };
+        if (first_pep.uniprot.length > 1) {
+            block.multi_protein = true;
+        }
+        if (quant !== null) {
+            block.quant = quant;
+        }
+        if (Object.keys(hexnac_type).length > 0) {
+            block.hexnac_type = Object.keys(hexnac_type);
+        }
+        if (first_pep.modifications) {
+            block.sites = first_pep.modifications;
+        }
+        if (first_pep.Composition) {
+            block.composition = first_pep.Composition;
+        }
+        first_pep.uniprot.forEach(function(uniprot) {
+            if ( ! data[uniprot] ) {
+                data[uniprot] = [];
+            }
+            data[uniprot].push(block);
+        });
+    });
+    return data;
 };
 
 
@@ -635,6 +680,7 @@ var onlyUnique = function(value, index, self) {
 };
 
 var global_results;
+var global_datablock;
 
 var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(err) {
 
@@ -664,6 +710,9 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
             result = result.then(function() {
                 // heapdump.writeSnapshot();
                 console.log("Peps remaining to check : ",to_cut.length);
+                if (nconf.get('hcd-processing-node')) {
+                    processing_node = parseInt(nconf.get('hcd-processing-node'));
+                }
                 if (to_cut.length > 0) {
                     return Promise.all(  to_cut.splice(0,split_length).map(function(pep) { return check_spectrum(db,pep,processing_node); }) ).then(arguments.callee);
                 }
@@ -672,7 +721,7 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
             return result;
         }).then(function(peps) {
             console.log("Got all data");
-            combine_all_peptides(peps);
+            global_datablock = combine_all_peptides(peps);
         }).catch(function(err) { console.log(arguments); console.log("Rejected"); });
 
     });
