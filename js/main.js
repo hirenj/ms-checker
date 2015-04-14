@@ -633,6 +633,9 @@ var combine_all_peptides = function(peps) {
             if ("CalculatedRatio" in pep) {
                 quant = pep.CalculatedRatio;
             }
+            if ("has_pair" in pep && pep.has_pair === true) {
+                quant = pep.QuanChannelID[0] == 1 ? 'potential_light' : 'potential_medium';
+            }
             if ("hexnac_type" in pep) {
                 hexnac_type[pep.hexnac_type] = true;
                 if (("GlcNAc" in hexnac_type || "GalNAc" in hexnac_type)) {
@@ -660,7 +663,7 @@ var combine_all_peptides = function(peps) {
             block.composition = first_pep.Composition;
         } else if (first_pep.modifications) {
             var count = 0;
-            block.composition = [first_pep.modifications.map(function(site) { count += 1; return site[1]; })[0], count ].reverse().join('x');
+            block.composition = [ [first_pep.modifications.map(function(site) { count += 1; return site[1]; })[0], count ].reverse().join('x') ];
         }
         first_pep.uniprot.forEach(function(uniprot) {
             if ( ! data[uniprot] ) {
@@ -681,6 +684,21 @@ var partial = function(fn) {
 var onlyUnique = function(value, index, self) {
     return self.indexOf(value) === index;
 };
+
+var pbcopy = function(data) { var proc = require('child_process').spawn('pbcopy'); proc.stdin.write(data); proc.stdin.end(); }
+
+var print_pep = function(protein,pep) { return [ protein, pep.sequence, pep.quant, pep.composition.join(',') ].join('\t'); };
+
+var filter_global_results = function(filter) {
+return Object.keys(global_datablock).map(function(prot) {
+    var peps = global_datablock[prot].filter(filter);
+    if (peps.length > 0) {
+        return peps.map( partial(print_pep,prot) ).join("\n");
+    }
+    return "";
+}).filter(function(val) { return val != ''; }).join("\n");
+};
+
 
 var global_results;
 var global_datablock;
