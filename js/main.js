@@ -85,6 +85,7 @@ FROM peptides \
     LEFT JOIN PrecursorIonQuanResults \
         ON PrecursorIonQuanResultsSearchSpectra.QuanResultID = PrecursorIonQuanResults.QuanResultID \
 WHERE peptides.ConfidenceLevel = 3 \
+AND SearchEngineRank = 1 \
 AND peptides.PeptideID in (SELECT distinct PeptideID \
     FROM PeptidesAminoAcidModifications \
     WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \
@@ -106,10 +107,12 @@ const related_quants_sql = 'SELECT \
     RT, \
     LeftRT, \
     RightRT, \
+    SN, \
+    QuanChannelID, \
     Charge \
 FROM EventAnnotations \
     JOIN Events USING(EventID) \
-WHERE QuanResultID = ?';
+WHERE QuanResultID = ? AND QuanChannelID = ?';
 
 const search_pair_sql = 'SELECT \
     * \
@@ -259,11 +262,21 @@ var check_potential_pair = function(db,pep,num_dimethyl) {
         if (pep.QuanChannelID.indexOf(2) >= 0) {
             mass_change_dir = -1;
         }
+        var sns = [];
+        pep.has_low_sn = false;
 
-        db.all(related_quants_sql,[ pep.QuanResultID ]).then(function(events) {
+        db.all(related_quants_sql,[ pep.QuanResultID, pep.QuanChannelID.filter(onlyUnique)[0] ]).then(function(events) {
             var events_length = events.length;
             events.forEach(function(ev) {
+
+                sns.push(ev.SN);
+
                 events_length -= 1;
+                if (events_length <= 0) {
+                    if (median(sns) < 10) {
+                        pep.has_low_sn = true;
+                    }
+                }
                 if (pep.has_pair) {
                     if (events_length <= 0) {
                         validated_quans_cache[pep.QuanResultID] = pep.has_pair;
@@ -466,6 +479,8 @@ var parse_spectrum = function(pep,readStream) {
 
     var galnac_intensity = null;
     var glcnac_intensity = null;
+    var galnac_count = 0;
+    var glcnac_count = 0;
 
     peak_stream.on('match', function(xml) {
         // Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
@@ -476,8 +491,10 @@ var parse_spectrum = function(pep,readStream) {
                 var intensity = parseFloat(result.Peak['$'].Y);
                 if ( is_glcnac_mass(mass) ) {
                     glcnac_intensity = (glcnac_intensity || 0) + intensity;
+                    glcnac_count += 1;
                 } else if ( is_galnac_mass(mass) ) {
                     galnac_intensity = (galnac_intensity || 0) + intensity;
+                    galnac_count += 1;
                 }
             }
         });
@@ -486,7 +503,10 @@ var parse_spectrum = function(pep,readStream) {
     var result = new Promise(function(resolve,reject) {
         readStream.on('end', function() {
             validated_hcd_cache[pep.SpectrumID] = { 'activation' : pep.activation };
-            if (pep.activation == 'HCD') {
+            if (galnac_count > 2 || glcnac_count > 2) {
+                console.log("More peaks counted than wanted for ",pep.SpectrumID);
+            }
+            if (pep.activation == 'HCD' && galnac_count == 2 && glcnac_count == 2) {
                 pep.galnac_intensity = galnac_intensity;
                 pep.glcnac_intensity = glcnac_intensity;
                 var ratio = galnac_intensity / glcnac_intensity;
@@ -566,6 +586,10 @@ var median = function(values) {
         return (values[half-1] + values[half]) / 2.0;
 }
 
+var not_hcd_filter = function(pep) {
+    return pep.activation !== 'HCD';
+};
+
 var combine_all_peptides = function(peps) {
     var data = {};
     var peptides_by_spectrum = {};
@@ -579,21 +603,30 @@ var combine_all_peptides = function(peps) {
     // Search by Spectrum ID:
     // Mark ambiguous peptides - if we have different sets of modifications for each spectrum, we can count that as ambiguous. Maybe mark out the possible amino acids? + total number of sites
     Object.keys(peptides_by_spectrum).forEach(function(spectrumID) {
+
+        // Don't accept any peptides that has been identified using HCD
+        // we don't trust the assignment, so we can skip them
+
         var peps = peptides_by_spectrum[spectrumID];
 
-        // Do we want to filter out the HCD identifications here?
+        // We want to count the number of modification keys for Non-HCD spectra
+        // that identify sites. If there are multiple modification keys
+        // it's a non-unique identification, so we should just use the
+        // composition
 
-        var mods = peps.map(function(pep) { return modification_key(pep); }).filter(function(key) { return key.indexOf('-') >= 0; });
-        if (mods.length > 1) {
-            peps.forEach(function(pep) {
+        var mods = peps.filter(not_hcd_filter).map(function(pep) { return modification_key(pep); }).filter(onlyUnique).filter(function(key) { return key.indexOf('-') >= 0; });
+
+        peps.forEach(function(pep) {
+            if (mods.length > 1 || pep.activation == 'HCD') {
                 if ( ! pep.Composition && pep.modifications.length > 0 ) {
                     // We should be a bit smarter about this, grouping compositions appropriately
                     pep.Composition =  [ ""+pep.modifications.length + "x" + pep.modifications[0][1] ];
                 }
                 pep.possible_mods = pep.modifications;
                 delete pep.modifications;
-            });
-        }
+            }
+        });
+
     });
     peptides_by_spectrum = null;
 
@@ -608,23 +641,42 @@ var combine_all_peptides = function(peps) {
 
     // Search by Peptide / (modifications + ambig key)
     // Combine quantitated peptides - seperating out into ambiguous / unambiguous.
-
     Object.keys(grouped_peptides).forEach(function(pep_key) {
-        var peps = grouped_peptides[pep_key];
+
+        // HCD identification is not used for quantification
+
+        var peps = grouped_peptides[pep_key].filter(not_hcd_filter);
         var quan_peps = peps.filter(function(pep) { return "QuanResultID" in pep;  });
         var singlet_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length < 2 && pep.has_pair == false; });
         var ratioed_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length == 2; });
         var target_ratio = null;
         if (ratioed_peps.length > 0) {
             var seen_quan_result_ids = {};
-            target_ratio = median( ratioed_peps.filter(function(pep) { var seen = pep.QuanResultID in seen_quan_result_ids; seen_quan_result_ids[pep.QuanResultID] = 1; return ! seen; }).map(function(pep) { return pep.areas[1] / pep.areas[0]; }) );
+
+            // We wish to consider each ratio once for each
+            // quantitation result. If there are multiple modifications
+            // or some other thing that boosts the number of peptides
+            // this will ignore them.
+
+            target_ratio = median( ratioed_peps.filter(function(pep) {
+                var seen = pep.QuanResultID in seen_quan_result_ids;
+                seen_quan_result_ids[pep.QuanResultID] = 1;
+                return ! seen;
+            }).map(function(pep) { return pep.areas[1] / pep.areas[0]; }) );
+
             singlet_peps.forEach(function(pep) { pep.used = false; });
             ratioed_peps.forEach(function(pep) { pep.used = true; });
+
         } else if (singlet_peps.length > 0)  {
 
             target_ratio = singlet_peps[0].QuanChannelID[0] == 1 ? 1/100000 : 100000;
 
-            // Check singlet ratios to see that they go in the same direction
+            var channel_ids = singlet_peps.map(function(pep) { return pep.QuanChannelID[0]; }).filter(onlyUnique);
+
+            if (channel_ids.length > 1) {
+                console.log(singlet_peps);
+                target_ratio = 'conflicting_singlets';
+            }
         }
         if (target_ratio) {
             quan_peps.forEach(function(pep) { pep.CalculatedRatio = target_ratio; });
@@ -638,12 +690,17 @@ var combine_all_peptides = function(peps) {
         }
         var first_pep = peps[0];
         var quant = null;
+        var high_sn = false;
         var hexnac_type = {};
         peps.forEach(function(pep) {
             if ("CalculatedRatio" in pep) {
                 quant = pep.CalculatedRatio;
+                high_sn = true;
             }
-            if ("has_pair" in pep && pep.has_pair === true) {
+            if ("has_low_sn" in pep && ! pep.has_low_sn) {
+                high_sn = true;
+            }
+            if ("has_pair" in pep && pep.has_pair === true && pep.activation !== 'HCD') {
                 quant = pep.QuanChannelID[0] == 1 ? 'potential_light' : 'potential_medium';
             }
             if ("hexnac_type" in pep) {
@@ -660,7 +717,7 @@ var combine_all_peptides = function(peps) {
         if (first_pep.uniprot.length > 1) {
             block.multi_protein = true;
         }
-        if (quant !== null) {
+        if (quant !== null && high_sn) {
             block.quant = quant;
         }
         if (Object.keys(hexnac_type).length > 0) {
