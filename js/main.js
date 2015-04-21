@@ -695,7 +695,9 @@ var combine_all_peptides = function(peps) {
         peps.forEach(function(pep) {
             if ("CalculatedRatio" in pep) {
                 quant = pep.CalculatedRatio;
-                high_sn = true;
+                if (pep.CalculatedRatio < 100000 && pep.CalculatedRatio > 100000) {
+                    high_sn = true;
+                }
             }
             if ("has_low_sn" in pep && ! pep.has_low_sn) {
                 high_sn = true;
