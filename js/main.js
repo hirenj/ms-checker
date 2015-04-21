@@ -150,9 +150,18 @@ FROM PeptidesAminoAcidModifications \
 WHERE PeptideID = ?';
 
 const all_peptide_modifications_sql = 'SELECT \
-    PeptideID, Position, ModificationName \
+    PeptideID, Position, ModificationName, DeltaMass \
 FROM PeptidesAminoAcidModifications \
-    LEFT JOIN AminoAcidModifications USING (AminoAcidModificationID)';
+    LEFT JOIN AminoAcidModifications USING (AminoAcidModificationID) \
+UNION \
+\
+SELECT \
+    PeptideID, 0, ModificationName, DeltaMass \
+FROM PeptidesTerminalModifications \
+    LEFT JOIN AminoAcidModifications ON PeptidesTerminalModifications.TerminalModificationID = AminoAcidModifications.AminoAcidModificationID \
+';
+
+
 
 const retrieve_spectrum_sql = 'SELECT \
     Spectrum \
@@ -199,6 +208,35 @@ WHERE (ProcessingNodeParentNumber LIKE ? \
 
 const MASS_MEDIUM = 32.056407;
 const MASS_LIGHT = 28.0313;
+
+const MASS_H = 1.007825;
+const MASS_C = 12.000000;
+const MASS_N = 14.003070;
+const MASS_O = 15.994910;
+
+const MASS_AMINO_ACIDS = {
+    A:71.03712,
+    C:103.00919,
+    D:115.02695,
+    E:129.0426,
+    F:147.06842,
+    G:57.02147,
+    H:137.05891,
+    I:113.08407,
+    K:128.09497,
+    L:113.08407,
+    M:131.0405,
+    N:114.04293,
+    P:97.05277,
+    Q:128.05858,
+    R:156.10112,
+    S:87.03203,
+    T:101.04768,
+    V:99.06842,
+    W:186.07932,
+    Y:163.06332
+};
+
 
 var dimethyl_count_cache = null;
 
@@ -340,7 +378,7 @@ var produce_peptide_modification_data = function(db,pep) {
                 peptide_modifications_cache = {};
                 data.forEach(function(mods) {
                     peptide_modifications_cache[mods.PeptideID] =  peptide_modifications_cache[mods.PeptideID] || [];
-                    peptide_modifications_cache[mods.PeptideID].push([ mods.Position + 1, mods.ModificationName ]);
+                    peptide_modifications_cache[mods.PeptideID].push([ mods.Position + 1, mods.ModificationName, mods.DeltaMass ]);
                 });
                 console.log("Populated Modifications cache");
 
@@ -402,7 +440,7 @@ var check_quantified_peptides = function(db,peps) {
     });
 };
 
-var validated_hcd_cache = {};
+var spectrum_caches = {};
 
 var unzip_spectrum = function(spectrum_text) {
     return new Promise(function(resolve,reject) {
@@ -434,88 +472,43 @@ var unzip_spectrum = function(spectrum_text) {
 
 };
 
-var is_galnac_mass = function(mz) {
-    var galnac_138 = 138.055;
-    var galnac_168 = 168.066;
-    return ((mz <= galnac_138*(1 + 15/1000000) && mz >= galnac_138*(1 - 15/1000000)) ||
-           (mz <= galnac_168*(1 + 15/1000000) && mz >= galnac_168*(1 - 15/1000000)) );
-};
-
-var is_glcnac_mass = function(mz) {
-    var glcnac_126 = 126.055;
-    var glcnac_144 = 144.065;
-    return ((mz <= glcnac_126*(1 + 15/1000000) && mz >= glcnac_126*(1 - 15/1000000)) ||
-           (mz <= glcnac_144*(1 + 15/1000000) && mz >= glcnac_144*(1 - 15/1000000)) );
-};
-
-
-var parse_spectrum = function(pep,readStream) {
-
-
-    if (validated_hcd_cache[pep.SpectrumID]) {
-        pep.activation = validated_hcd_cache[pep.SpectrumID].activation;
-        if (validated_hcd_cache[pep.SpectrumID].hexnac_type) {
-            pep.galnac_intensity = validated_hcd_cache[pep.SpectrumID].galnac_intensity;
-            pep.glcnac_intensity = validated_hcd_cache[pep.SpectrumID].glcnac_intensity;
-            pep.hexnac_type = validated_hcd_cache[pep.SpectrumID].hexnac_type;
-        }
-        return true;
-    }
+var parse_spectrum = function(readStream) {
 
     var saxParser = sax.createStream(true);
     var peak_stream = new saxpath.SaXPath(saxParser, '//PeakCentroids/Peak');
     var activation_stream = new saxpath.SaXPath(saxParser, '/MassSpectrum/ScanEvent/ActivationTypes');
 
-    // We should be matching this ActivationType first
+    // ActivationType normally is the first thing matched
+
+    var spectrum_object = {};
 
     activation_stream.on('match', function(xml) {
         // Check that we're matching a HCD spectrum here
         xml2js.parseString(xml,function(err,result) {
             if (! err ) {
-                pep.activation = result.ActivationTypes;
+                spectrum_object.activation = result.ActivationTypes;
             }
         });
     });
 
-    var galnac_intensity = null;
-    var glcnac_intensity = null;
-    var galnac_count = 0;
-    var glcnac_count = 0;
+    spectrum_object.peaks = [];
 
     peak_stream.on('match', function(xml) {
-        // Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
-        // if it is within 0.4 - 0.6, it is a GalNAc, 2.0 or greater, GlcNAc
         xml2js.parseString(xml,function(err,result) {
             if (! err ) {
-                var mass = parseFloat(result.Peak['$'].X);
-                var intensity = parseFloat(result.Peak['$'].Y);
-                if ( is_glcnac_mass(mass) ) {
-                    glcnac_intensity = (glcnac_intensity || 0) + intensity;
-                    glcnac_count += 1;
-                } else if ( is_galnac_mass(mass) ) {
-                    galnac_intensity = (galnac_intensity || 0) + intensity;
-                    galnac_count += 1;
-                }
+                spectrum_object.peaks.push({
+                    mass: parseFloat(result.Peak['$'].X),
+                    intensity: parseFloat(result.Peak['$'].Y),
+                    charge: parseFloat(result.Peak['$'].Z),
+                    sn: parseFloat(result.Peak['$'].SN)
+                });
             }
         });
     });
 
     var result = new Promise(function(resolve,reject) {
         readStream.on('end', function() {
-            validated_hcd_cache[pep.SpectrumID] = { 'activation' : pep.activation };
-            if (galnac_count > 2 || glcnac_count > 2) {
-                console.log("More peaks counted than wanted for ",pep.SpectrumID);
-            }
-            if (pep.activation == 'HCD' && galnac_count == 2 && glcnac_count == 2) {
-                pep.galnac_intensity = galnac_intensity;
-                pep.glcnac_intensity = glcnac_intensity;
-                var ratio = galnac_intensity / glcnac_intensity;
-                pep.hexnac_type = (ratio <= 0.95) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'Unknown' );
-                validated_hcd_cache[pep.SpectrumID].galnac_intensity = galnac_intensity;
-                validated_hcd_cache[pep.SpectrumID].glcnac_intensity = glcnac_intensity;
-                validated_hcd_cache[pep.SpectrumID].hexnac_type = pep.hexnac_type;
-            }
-            resolve();
+            resolve( spectrum_object );
         });
     });
 
@@ -538,14 +531,74 @@ var init_spectrum_processing_num = function(db) {
     });
 };
 
-var check_spectrum = function(db,pep,processing_node) {
-    return db.all(retrieve_spectrum_sql, [ pep.SpectrumID, processing_node ]).then(function(spectra) {
+var get_spectrum = function(db,pep,processing_node) {
+    spectrum_caches[pep.SpectrumID] = spectrum_caches[pep.SpectrumID] || db.all(retrieve_spectrum_sql, [ pep.SpectrumID, processing_node ]).then(function(spectra) {
         if (spectra.length == 0) {
             return;
         }
         var spectrum = spectra[0].Spectrum;
-        return unzip_spectrum(spectrum).then(partial(parse_spectrum,pep));
+        return unzip_spectrum(spectrum).then(parse_spectrum).then(function(spectrum){
+            spectrum.spectrumID = pep.spectrumID;
+            return spectrum;
+        });
     });
+    return spectrum_caches[pep.SpectrumID];
+};
+
+var is_galnac_mass = function(mz) {
+    var galnac_138 = 138.055;
+    var galnac_168 = 168.066;
+    return ((mz <= galnac_138*(1 + 15/1000000) && mz >= galnac_138*(1 - 15/1000000)) ||
+           (mz <= galnac_168*(1 + 15/1000000) && mz >= galnac_168*(1 - 15/1000000)) );
+};
+
+var is_glcnac_mass = function(mz) {
+    var glcnac_126 = 126.055;
+    var glcnac_144 = 144.065;
+    return ((mz <= glcnac_126*(1 + 15/1000000) && mz >= glcnac_126*(1 - 15/1000000)) ||
+           (mz <= glcnac_144*(1 + 15/1000000) && mz >= glcnac_144*(1 - 15/1000000)) );
+};
+
+var check_galnac_glcnac_ratio = function(pep,spectrum) {
+    if (! spectrum ) {
+        return;
+    }
+    var galnac_intensity = null;
+    var glcnac_intensity = null;
+    var galnac_count = 0;
+    var glcnac_count = 0;
+    if (spectrum.activation !== 'HCD') {
+        return;
+    }
+    pep.activation = 'HCD';
+
+    // Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
+    // if it is within 0.4 - 0.6, it is a GalNAc, 2.0 or greater, GlcNAc
+
+    spectrum.peaks.forEach(function(peak) {
+        var mass = peak.mass;
+        var intensity = peak.intensity;
+        if ( is_glcnac_mass(mass) ) {
+            glcnac_intensity = (glcnac_intensity || 0) + intensity;
+            glcnac_count += 1;
+        } else if ( is_galnac_mass(mass) ) {
+            galnac_intensity = (galnac_intensity || 0) + intensity;
+            galnac_count += 1;
+        }
+    });
+
+    if (galnac_count > 2 || glcnac_count > 2) {
+        console.log("More peaks counted than wanted for ",pep.SpectrumID);
+    }
+
+    if (galnac_count == 2 && glcnac_count == 2) {
+        pep.galnac_intensity = galnac_intensity;
+        pep.glcnac_intensity = glcnac_intensity;
+        var ratio = galnac_intensity / glcnac_intensity;
+        pep.hexnac_type = (ratio <= 0.95) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'Unknown' );
+    }
+
+    return;
 };
 
 var retrieve_ambiguous_peptides = function(db) {
@@ -561,6 +614,50 @@ var retrieve_ambiguous_peptides = function(db) {
             return peps;
         });
     } );
+};
+//https://github.com/compomics/thermo-msf-parser/blob/master/thermo_msf_parser_API/src/main/java/com/compomics/thermo_msf_parser_API/highmeminstance/Peptide.java
+var assign_peptide_ions = function(pep,spectrum) {
+
+};
+
+// calculate_fragment_ions(global_results.filter(function(pep) { return pep.Sequence == 'YSEFFTGSK'; })[0],1);
+
+var calculate_fragment_ions = function(pep,spectrum_charge) {
+    var mods = peptide_modifications_cache[pep.PeptideID];
+    var null_mass = [0,0,0];
+    var masses = pep.Sequence.split('').map(function(aa,idx) { return MASS_AMINO_ACIDS[aa] + (mods.filter(function(mod) { return mod[0] === (idx + 1); })[0] || null_mass)[2];  });
+    var ions = [];
+    var charge = spectrum_charge;
+    var b_ion_base, y_ion_base;
+    while(charge > 0) {
+        b_ion_base = 0;
+        y_ion_base = 2*MASS_H + MASS_O;
+
+        for (var i = 0 ; i < pep.Sequence.length; i++) {
+            b_ion_base += masses[i];
+            y_ion_base += masses[(masses.length - 1) - i];
+
+            // FIXME: Check calculation for b_nh3 ion
+            // { 'type' : 'b_nh3_'+(i+1), 'mz' : (b_ion_base - MASS_O + 2 * MASS_N - 3* MASS_H + charge * MASS_H) / charge, 'z' : charge },
+
+            ions = ions.concat( [
+            { 'type' : 'b'+(i+1), 'mz' : (b_ion_base + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'b_h2o_'+(i+1), 'mz' : (b_ion_base - MASS_O - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'a'+(i+1), 'mz' : (b_ion_base - MASS_O - MASS_C + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'a_nh3_'+(i+1), 'mz' : (b_ion_base - MASS_O - MASS_C - MASS_N - 3 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'a_h20_'+(i+1), 'mz' : (b_ion_base - 2*MASS_O - MASS_C - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'c'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
+
+            { 'type' : 'y'+(i+1), 'mz' : (y_ion_base + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'y_nh3_'+(i+1), 'mz' : (y_ion_base - MASS_N - 3 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'y_h2o_'+(i+1), 'mz' : (y_ion_base - 2* MASS_H - MASS_O + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'x'+(i+1), 'mz' : (y_ion_base + MASS_C + MASS_O - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'z'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge }
+            ]);
+        }
+        charge -= 1;
+    }
+    return ions;
 };
 
 var modification_key = function(pep) {
@@ -799,7 +896,7 @@ var collect_galnac_ratios = function(peps) {
 }
 
 
-var global_results;
+var global_results = [];
 var global_datablock;
 
 var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(err) {
@@ -813,8 +910,9 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
         retrieve_quantified_peptides(db).then(partial(check_quantified_peptides,db)).then(function(peps) {
             db.end_statement(peptide_metadata_sql);
             console.log("Done singlet checking");
-            global_results = peps;
-        }).then(partial(retrieve_ambiguous_peptides,db)).then(function(peps) {
+            global_results = global_results.concat(peps);
+        });
+        Promise.reject(false).then(partial(retrieve_ambiguous_peptides,db)).then(function(peps) {
             console.log("Done ambiguous peptides");
             global_results = global_results.concat(peps);
             return global_results;
@@ -834,7 +932,7 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
                     processing_node = parseInt(nconf.get('hcd-processing-node'));
                 }
                 if (to_cut.length > 0) {
-                    return Promise.all(  to_cut.splice(0,split_length).map(function(pep) { return check_spectrum(db,pep,processing_node); }) ).then(arguments.callee);
+                    return Promise.all(  to_cut.splice(0,split_length).map(function(pep) { return get_spectrum(db,pep,processing_node).then( partial(check_galnac_glcnac_ratio,pep) ); }) ).then(arguments.callee);
                 }
                 return peps;
             });
