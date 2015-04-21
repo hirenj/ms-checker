@@ -164,7 +164,7 @@ FROM PeptidesTerminalModifications \
 
 
 const retrieve_spectrum_sql = 'SELECT \
-    Spectrum \
+    Spectrum, Charge \
 FROM SpectrumHeaders \
     LEFT JOIN Spectra USING (UniqueSpectrumID) \
 WHERE SpectrumID = ? AND SpectrumHeaders.CreatingProcessingNodeNumber = ?';
@@ -537,8 +537,10 @@ var get_spectrum = function(db,pep,processing_node) {
             return;
         }
         var spectrum = spectra[0].Spectrum;
+        var charge = spectra[0].Charge;
         return unzip_spectrum(spectrum).then(parse_spectrum).then(function(spectrum){
             spectrum.spectrumID = pep.spectrumID;
+            spectrum.charge = charge;
             return spectrum;
         });
     });
@@ -616,8 +618,31 @@ var retrieve_ambiguous_peptides = function(db) {
     } );
 };
 //https://github.com/compomics/thermo-msf-parser/blob/master/thermo_msf_parser_API/src/main/java/com/compomics/thermo_msf_parser_API/highmeminstance/Peptide.java
-var assign_peptide_ions = function(pep,spectrum) {
+var assign_peptide_ions = function(db,pep) {
+    return get_spectrum(db,pep,4).then(function(spectrum) {
+        var theoretical_ions = calculate_fragment_ions(pep,spectrum.charge || 1);
+        return theoretical_ions.filter(function(ion) {
+            var min_mz = ion.mz * ( 1 - 15/1000000);
+            var max_mz = ion.mz * ( 1 + 15/1000000);
+            var matching_peaks = spectrum.peaks.filter(function(peak) {  return peak.mass <= max_mz && peak.mass >= min_mz;   });
+            return matching_peaks.length > 0;
+        });
+    });
+};
 
+var get_b_ion_coverage = function(db,pep) {
+    return assign_peptide_ions(db,pep).then(function(ions) {
+        return ions.map( function(ion_data) {
+            var ion = ion_data.type;
+            if (ion.match(/[yz]\d+/)) {
+                return 'B'+(pep.Sequence.length - parseInt(ion.replace(/[yz]/,'')));
+            }
+            if (ion.match(/[c]\d+/)) {
+                return ion.replace(/c/,'b');
+            }
+            return ion;
+        });
+    });
 };
 
 // calculate_fragment_ions(global_results.filter(function(pep) { return pep.Sequence == 'YSEFFTGSK'; })[0],1);
