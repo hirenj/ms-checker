@@ -553,7 +553,6 @@ var get_spectrum = function(db,pep,processing_node) {
         if ( typeof processing_node !== 'undefined' && processing_node !== null ) {
             spectrum_promise = db.all(retrieve_spectrum_from_node_sql, [ pep.SpectrumID, processing_node ]);
         } else {
-            console.log("Getting from only spectrum id");
             spectrum_promise = db.all(retrieve_spectrum_sql, [ pep.SpectrumID ]);
         }
     }
@@ -1051,16 +1050,17 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
             var processing_node = null;
             var result = init_spectrum_processing_num(db).then(function(node) {
                 processing_node = node;
-                console.log("We only want spectra from Processing Node ",processing_node);
                 return true;
             });
             var split_length = 50;
             result = result.then(function() {
-                // heapdump.writeSnapshot();
-                console.log("Peps remaining to check : ",to_cut.length);
                 if (nconf.get('hcd-processing-node')) {
                     processing_node = parseInt(nconf.get('hcd-processing-node'));
                 }
+
+                console.log("We only want spectra from Processing Node ",processing_node);
+                // heapdump.writeSnapshot();
+                console.log("Peps remaining to check : ",to_cut.length);
                 if (to_cut.length > 0) {
                     return Promise.all(  to_cut.splice(0,split_length).map(function(pep) { return get_spectrum(db,pep,processing_node).then( partial(check_galnac_glcnac_ratio,pep) ); }) ).then(arguments.callee);
                 }
