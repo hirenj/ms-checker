@@ -703,8 +703,8 @@ var assign_peptide_ions = function(db,pep) {
             return ! ion_filters(ion.type);
         });
         theoretical_ions.forEach(function(ion) {
-            var min_mz = ion.mz - 0.02;
-            var max_mz = ion.mz + 0.02;
+            var min_mz = ion.mz - 0.05;
+            var max_mz = ion.mz + 0.05;
             var matching_peaks = spectrum.peaks.filter(function(peak) {  return peak.mass <= max_mz && peak.mass >= min_mz;   });
             ion.peaks = matching_peaks;
         });
@@ -744,12 +744,11 @@ var calculate_fragment_ions = function(pep,spectrum_charge) {
             b_ion_base += masses[i];
             y_ion_base += masses[(masses.length - 1) - i];
 
-            // FIXME: Check calculation for b_nh3 ion
-            // { 'type' : 'b_nh3_'+(i+1), 'mz' : (b_ion_base - MASS_O + 2 * MASS_N - 3* MASS_H + charge * MASS_H) / charge, 'z' : charge },
 
             ions = ions.concat( [
             { 'type' : 'b'+(i+1), 'mz' : (b_ion_base + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'b_h2o_'+(i+1), 'mz' : (b_ion_base - MASS_O - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'b_nh3_'+(i+1), 'mz' : (b_ion_base - MASS_O - MASS_N - 3* MASS_H + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'a'+(i+1), 'mz' : (b_ion_base - MASS_O - MASS_C + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'a_nh3_'+(i+1), 'mz' : (b_ion_base - MASS_O - MASS_C - MASS_N - 3 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'a_h20_'+(i+1), 'mz' : (b_ion_base - 2*MASS_O - MASS_C - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
