@@ -161,9 +161,25 @@ FROM PeptidesTerminalModifications \
     LEFT JOIN AminoAcidModifications ON PeptidesTerminalModifications.TerminalModificationID = AminoAcidModifications.AminoAcidModificationID \
 ';
 
-
-
 const retrieve_spectrum_sql = 'SELECT \
+    Spectrum, Charge \
+FROM SpectrumHeaders \
+    LEFT JOIN Spectra USING (UniqueSpectrumID) \
+WHERE SpectrumID = ?';
+
+
+const retrieve_matching_node_config_sql = 'SELECT \
+    ProcessingNodeNumber, ParameterName, ParameterValue \
+FROM Peptides \
+JOIN \
+    ProcessingNodeParameters USING(ProcessingNodeNumber) \
+WHERE \
+    PeptideID = ? \
+AND \
+    Category = "4. Spectrum Matching" \
+';
+
+const retrieve_spectrum_from_node_sql = 'SELECT \
     Spectrum, Charge \
 FROM SpectrumHeaders \
     LEFT JOIN Spectra USING (UniqueSpectrumID) \
@@ -532,14 +548,23 @@ var init_spectrum_processing_num = function(db) {
 };
 
 var get_spectrum = function(db,pep,processing_node) {
-    spectrum_caches[pep.SpectrumID] = spectrum_caches[pep.SpectrumID] || db.all(retrieve_spectrum_sql, [ pep.SpectrumID, processing_node ]).then(function(spectra) {
+    var spectrum_promise;
+    if ( ! spectrum_caches[pep.SpectrumID] ) {
+        if ( typeof processing_node !== 'undefined' && processing_node !== null ) {
+            spectrum_promise = db.all(retrieve_spectrum_from_node_sql, [ pep.SpectrumID, processing_node ]);
+        } else {
+            console.log("Getting from only spectrum id");
+            spectrum_promise = db.all(retrieve_spectrum_sql, [ pep.SpectrumID ]);
+        }
+    }
+    spectrum_caches[pep.SpectrumID] = spectrum_caches[pep.SpectrumID] || spectrum_promise.then(function(spectra) {
         if (spectra.length == 0) {
             return;
         }
         var spectrum = spectra[0].Spectrum;
         var charge = spectra[0].Charge;
         return unzip_spectrum(spectrum).then(parse_spectrum).then(function(spectrum){
-            spectrum.spectrumID = pep.spectrumID;
+            spectrum.spectrumID = pep.SpectrumID;
             spectrum.charge = charge;
             return spectrum;
         });
@@ -617,16 +642,74 @@ var retrieve_ambiguous_peptides = function(db) {
         });
     } );
 };
+
+var cached_node_filters = {};
+
+var get_ion_matching_config = function(db,pep) {
+    return db.all(retrieve_matching_node_config_sql,[pep.PeptideID]).then(function(configs) {
+        var filters = [];
+        if (configs.length < 1) {
+            return function() { return false; };
+        }
+        if (cached_node_filters[configs[0].ProcessingNodeNumber]) {
+            return cached_node_filters[configs[0].ProcessingNodeNumber];
+        }
+        configs.forEach(function(config) {
+            if (config.ParameterValue == "1" || config.ParameterValue == "True" ) {
+                return;
+            }
+            if (config.ParameterName == 'UseNeutralAIons') {
+                filters.push(/a_[nh]/);
+            }
+            if (config.ParameterName == 'UseNeutralBIons') {
+                filters.push(/b_[nh]/);
+            }
+            if (config.ParameterName == 'UseNeutralYIons') {
+                filters.push(/y_[nh]/);
+            }
+            if (config.ParameterName == 'IonSerieA') {
+                filters.push(/a/);
+            }
+            if (config.ParameterName == 'IonSerieB') {
+                filters.push(/b/);
+            }
+            if (config.ParameterName == 'IonSerieC') {
+                filters.push(/c/);
+            }
+            if (config.ParameterName == 'IonSerieX') {
+                filters.push(/x/);
+            }
+            if (config.ParameterName == 'IonSerieY') {
+                filters.push(/y/);
+            }
+            if (config.ParameterName == 'IonSerieZ') {
+                filters.push(/z/);
+            }
+        });
+        cached_node_filters[configs[0].ProcessingNodeNumber] = function(type) {
+            return filters.reduce(function(val,regex) { return val ? val : regex.test(type); } , false );
+        };
+        return cached_node_filters[configs[0].ProcessingNodeNumber];
+    });
+};
+
+//get_b_ion_coverage(global_db, global_results.filter(function(pep) { return pep.Sequence == 'LDEEEEDNEGGEWER'; })[0] ).then(function(ions) { console.log(ions.filter(function(ion) { return ion[1].z == 1; })); });
+
 //https://github.com/compomics/thermo-msf-parser/blob/master/thermo_msf_parser_API/src/main/java/com/compomics/thermo_msf_parser_API/highmeminstance/Peptide.java
 var assign_peptide_ions = function(db,pep) {
-    return get_spectrum(db,pep,4).then(function(spectrum) {
-        var theoretical_ions = calculate_fragment_ions(pep,spectrum.charge || 1);
-        return theoretical_ions.filter(function(ion) {
-            var min_mz = ion.mz * ( 1 - 15/1000000);
-            var max_mz = ion.mz * ( 1 + 15/1000000);
-            var matching_peaks = spectrum.peaks.filter(function(peak) {  return peak.mass <= max_mz && peak.mass >= min_mz;   });
-            return matching_peaks.length > 0;
+    return Promise.all( [ get_spectrum(db,pep), get_ion_matching_config(db,pep) ]).then(function(spec_data) {
+        var spectrum = spec_data[0];
+        var ion_filters = spec_data[1];
+        var theoretical_ions = calculate_fragment_ions(pep,spectrum.charge || 1).filter(function(ion) {
+            return ! ion_filters(ion.type);
         });
+        theoretical_ions.forEach(function(ion) {
+            var min_mz = ion.mz - 0.02;
+            var max_mz = ion.mz + 0.02;
+            var matching_peaks = spectrum.peaks.filter(function(peak) {  return peak.mass <= max_mz && peak.mass >= min_mz;   });
+            ion.peaks = matching_peaks;
+        });
+        return theoretical_ions.filter(function(ion) { return (ion.peaks || []).length > 0; });
     });
 };
 
@@ -635,12 +718,12 @@ var get_b_ion_coverage = function(db,pep) {
         return ions.map( function(ion_data) {
             var ion = ion_data.type;
             if (ion.match(/[yz]\d+/)) {
-                return 'B'+(pep.Sequence.length - parseInt(ion.replace(/[yz]/,'')));
+                return [ 'B'+(pep.Sequence.length - parseInt(ion.replace(/[yz]/,''))), ion_data ];
             }
             if (ion.match(/[c]\d+/)) {
-                return ion.replace(/c/,'b');
+                return [ ion.replace(/c/,'b'), ion_data ];
             }
-            return ion;
+            return [ ion, ion_data ];
         });
     });
 };
@@ -648,7 +731,7 @@ var get_b_ion_coverage = function(db,pep) {
 // calculate_fragment_ions(global_results.filter(function(pep) { return pep.Sequence == 'YSEFFTGSK'; })[0],1);
 
 var calculate_fragment_ions = function(pep,spectrum_charge) {
-    var mods = peptide_modifications_cache[pep.PeptideID];
+    var mods = peptide_modifications_cache[pep.PeptideID] || [];
     var null_mass = [0,0,0];
     var masses = pep.Sequence.split('').map(function(aa,idx) { return MASS_AMINO_ACIDS[aa] + (mods.filter(function(mod) { return mod[0] === (idx + 1); })[0] || null_mass)[2];  });
     var ions = [];
@@ -772,6 +855,7 @@ var combine_all_peptides = function(peps) {
         var singlet_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length < 2 && pep.has_pair == false; });
         var ratioed_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length == 2; });
         var target_ratio = null;
+        var target_ratio_mad = null;
         if (ratioed_peps.length > 0) {
             var seen_quan_result_ids = {};
 
@@ -779,12 +863,29 @@ var combine_all_peptides = function(peps) {
             // quantitation result. If there are multiple modifications
             // or some other thing that boosts the number of peptides
             // this will ignore them.
+            //
+            // There are cases where there is a single QuanResultID,
+            // but there are multiple spectra (and identified peptides) associated
+            // with this one QuanResultID
 
-            target_ratio = median( ratioed_peps.filter(function(pep) {
+            var all_ratios = ratioed_peps.filter(function(pep) {
                 var seen = pep.QuanResultID in seen_quan_result_ids;
                 seen_quan_result_ids[pep.QuanResultID] = 1;
                 return ! seen;
-            }).map(function(pep) { return pep.areas[1] / pep.areas[0]; }) );
+            }).map(function(pep) { return pep.areas[1] / pep.areas[0]; });
+
+            target_ratio = median( all_ratios  );
+
+            // We wish to record the mad to see if we are picking up
+            // different populations of sites. Higher mad means that
+            // there that there can be another population of values
+            // here. This is especially useful for the ambiguous
+            // modification sites, where we might see various populations.
+
+            // We can always go back to them to examine them later.
+
+            target_ratio_mad = median(all_ratios.map(function(ratio) { return Math.abs(ratio - target_ratio); }));
+
 
             singlet_peps.forEach(function(pep) { pep.used = false; });
             ratioed_peps.forEach(function(pep) { pep.used = true; });
@@ -801,7 +902,12 @@ var combine_all_peptides = function(peps) {
             }
         }
         if (target_ratio) {
-            quan_peps.forEach(function(pep) { pep.CalculatedRatio = target_ratio; });
+            quan_peps.forEach(function(pep) {
+                if (target_ratio_mad !== null) {
+                    pep.CalculatedRatio_mad = target_ratio_mad;
+                }
+                pep.CalculatedRatio = target_ratio;
+            });
         }
     });
 
@@ -840,7 +946,7 @@ var combine_all_peptides = function(peps) {
             block.multi_protein = true;
         }
         if (quant !== null && high_sn) {
-            block.quant = quant;
+            block.quant = isNaN(parseInt(quant)) ? {'quant' : quant } : {'quant' : quant, 'mad' : first_pep.CalculatedRatio_mad };
         }
         if (Object.keys(hexnac_type).length > 0) {
             block.hexnac_type = Object.keys(hexnac_type);
@@ -876,7 +982,7 @@ var onlyUnique = function(value, index, self) {
 
 var pbcopy = function(data) { var proc = require('child_process').spawn('pbcopy'); proc.stdin.write(data); proc.stdin.end(); }
 
-var print_pep = function(protein,pep) { return [ protein, pep.sequence, pep.quant, pep.composition.map(function(comp) { return comp.replace(/x.*/,''); }).join(',') ].join('\t'); };
+var print_pep = function(protein,pep) { return [ protein, pep.sequence, pep.quant ? pep.quant.quant : "", pep.quant ? pep.quant.mad : "" , pep.composition.map(function(comp) { return comp.replace(/x.*/,''); }).join(',') ].join('\t'); };
 
 var filter_global_results = function(datablock,filter) {
 if ( typeof datablock === 'function' ) {
@@ -886,7 +992,7 @@ if ( typeof datablock === 'function' ) {
 if ( ! filter ) {
     filter = function() { return true; };
 }
-return "uniprot\tsequence\tquant\tglyco\n"+
+return "uniprot\tsequence\tquant\tquant_mad\tglyco\n"+
 Object.keys(datablock).map(function(prot) {
     var peps = datablock[prot].filter(filter);
     if (peps.length > 0) {
@@ -936,8 +1042,7 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
             db.end_statement(peptide_metadata_sql);
             console.log("Done singlet checking");
             global_results = global_results.concat(peps);
-        });
-        Promise.reject(false).then(partial(retrieve_ambiguous_peptides,db)).then(function(peps) {
+        }).then(partial(retrieve_ambiguous_peptides,db)).then(function(peps) {
             console.log("Done ambiguous peptides");
             global_results = global_results.concat(peps);
             return global_results;
