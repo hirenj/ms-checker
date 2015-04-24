@@ -186,7 +186,7 @@ FROM SpectrumHeaders \
 WHERE SpectrumID = ? AND SpectrumHeaders.CreatingProcessingNodeNumber = ?';
 
 
-const retrieve_ambiguous_peptides_sql = 'SELECT \
+const retrieve_ambiguous_peptides_glyco_sql = 'SELECT \
     Peptides.PeptideID, Peptides.SpectrumID, Peptides.Sequence, FileInfos.Filename \
 FROM FileInfos \
     LEFT JOIN MassPeaks USING(FileID) \
@@ -203,6 +203,16 @@ FROM FileInfos \
         ) \
     AND \
         Peptides.ConfidenceLevel = 3';
+
+const retrieve_ambiguous_peptides_sql = 'SELECT \
+    Peptides.PeptideID, Peptides.SpectrumID, Peptides.Sequence, FileInfos.Filename \
+FROM FileInfos \
+    LEFT JOIN MassPeaks USING(FileID) \
+    LEFT JOIN SpectrumHeaders USING(MassPeakID) \
+    JOIN Peptides using(SpectrumID) \
+    WHERE \
+        Peptides.ConfidenceLevel = 3';
+
 
 const hcd_processing_node_number_sql = 'SELECT \
     ProcessingNodeNumber \
@@ -628,7 +638,8 @@ var check_galnac_glcnac_ratio = function(pep,spectrum) {
 };
 
 var retrieve_ambiguous_peptides = function(db) {
-    return db.all(retrieve_ambiguous_peptides_sql).then(function(peps) {
+    var sql = nconf.get("match-all-ambiguous") ? retrieve_ambiguous_peptides_sql : retrieve_ambiguous_peptides_glyco_sql;
+    return db.all(sql).then(function(peps) {
         return Promise.all( peps.map(function(pep) { return produce_peptide_data(db,pep); }) ).then(function() {
             peps.forEach(function(pep) {
                 var composition = (pep.FileName || "").match(/\d+\x.+(?=\.mgf)/);
@@ -712,20 +723,117 @@ var assign_peptide_ions = function(db,pep) {
     });
 };
 
+var filter_assigned_for_isotope_envelope = function(ions) {
+    return ions.filter(function(ion) {
+        var peaks = (ion.peaks || []).filter(function(peak) { return peak.charge !== 0 && peak.charge == ion.z; });
+        if (peaks.length > 0) {
+            return true;
+        }
+        return false;
+    });
+    // return ions.filter(function(ion) {
+    //     return ((ion.peaks || []).length  > 0);
+    // });
+};
+
 var get_b_ion_coverage = function(db,pep) {
-    return assign_peptide_ions(db,pep).then(function(ions) {
+    return assign_peptide_ions(db,pep).then(filter_assigned_for_isotope_envelope).then(function(ions) {
         return ions.map( function(ion_data) {
             var ion = ion_data.type;
-            if (ion.match(/[yz]\d+/)) {
-                return [ 'B'+(pep.Sequence.length - parseInt(ion.replace(/[yz]/,''))), ion_data ];
+            var match;
+            if (match = ion.match(/[xyz](?:_.+_)?(\d+)$/)) {
+                return pep.Sequence.length - parseInt(match[1]);
             }
-            if (ion.match(/[c]\d+/)) {
-                return [ ion.replace(/c/,'b'), ion_data ];
+            if (match = ion.match(/[acb](?:_.+_)?(\d+)/)) {
+                return parseInt(match[1]);
             }
-            return [ ion, ion_data ];
-        });
+        }).filter(function(pos) { return pos && pos > 0; }).filter(onlyUnique).sort(function(a,b) { return a-b; });
     });
 };
+
+var get_coverage_for_sites = function(pep,b_ions) {
+    if (! pep.modifications || pep.modifications.length == 0 || b_ions.length == 0) {
+        return [];
+    }
+    return pep.modifications.map(function(mod) {
+       var pos = mod[0];
+       var min = [0].concat(b_ions).filter(function(ion) { return ion < pos; }).reverse()[0];
+       var max = b_ions.concat([pep.Sequence.length]).filter(function(ion) { return ion >= pos; })[0];
+       return ""+min+"-"+pep.Sequence.substring(min,max);
+    });
+};
+
+var resolve_glyco_modifications = function(pep) {
+    return resolve_modifications(pep,/[STY]/g);
+};
+
+var resolve_modifications = function(pep,aa_re) {
+    var mods = [].concat(pep.modifications);
+    var groups = {};
+    pep.modification_peptides.forEach(function(aas) {
+        if ( ! groups[aas]) {
+            groups[aas] = [];
+        }
+        groups[aas].push(mods.shift());
+    });
+
+    var is_ambiguous = false;
+    Object.keys(groups).forEach(function(aagroup) {
+        var seq = aagroup.split('-')[1];
+        var start_pos = parseInt(aagroup.split('-')[0]);
+        var start;
+        var end;
+        var match;
+
+        if ( seq.match(aa_re).length > groups[aagroup].length ) {
+            is_ambiguous = true;
+            while ( match = aa_re.exec(seq) ) {
+                if ( ! start ) {
+                    start = start_pos + match.index;
+                } else {
+                    end = start_pos + match.index;
+                }
+            }
+            groups[aagroup].forEach(function(mod) {
+                mod[3] = start + 1;
+                mod[4] = end + 1;
+            });
+        }
+    });
+    if (is_ambiguous) {
+        if ( ! pep.Composition && is_ambiguous ) {
+            pep.Composition =  extract_composition(pep.modifications);
+        }
+        pep.possible_mods = pep.modifications;
+        delete pep.modifications;
+    }
+    return pep;
+};
+
+var extract_composition = function(mods) {
+    var compositions = {};
+    mods.forEach(function(mod) {
+        if (! compositions[mod[1]]) {
+            compositions[mod[1]] = 0;
+        }
+        compositions[mod[1]] += 1;
+    });
+    return Object.keys(compositions).map(function(comp) {  return compositions[comp]+"x"+comp; }).sort();
+};
+
+var validate_peptide_coverage = function(db,peptides) {
+    return Promise.all(peptides.filter(function(pep) { return pep.modifications && pep.modifications.length > 0; }).map(function(pep) {
+        return get_b_ion_coverage(db,pep).then(function(ions) {
+            pep.modification_peptides = get_coverage_for_sites(pep,ions);
+            return pep;
+        });
+    })).then(function(modified_peps) {
+        modified_peps.forEach(resolve_glyco_modifications);
+    }).then(function() {
+        return peptides;
+    });
+};
+
 
 // calculate_fragment_ions(global_results.filter(function(pep) { return pep.Sequence == 'YSEFFTGSK'; })[0],1);
 
@@ -772,7 +880,7 @@ var modification_key = function(pep) {
         mod_key = pep.modifications.sort(function(a,b) { return a[0] - b[0]; }).map(function(mod) {  return mod[0]+"-"+mod[1]; }).join(',');
     }
     if (pep.Composition) {
-        mod_key = pep.Composition.join(',');
+        mod_key = pep.Composition.sort().join(',');
     }
     return mod_key;
 };
@@ -821,10 +929,14 @@ var combine_all_peptides = function(peps) {
 
         peps.forEach(function(pep) {
             if (mods.length > 1 || pep.activation == 'HCD') {
-                if ( ! pep.Composition && pep.modifications.length > 0 ) {
+                if ( ! pep.Composition && pep.modifications && pep.modifications.length > 0 ) {
                     // We should be a bit smarter about this, grouping compositions appropriately
-                    pep.Composition =  [ ""+pep.modifications.length + "x" + pep.modifications[0][1] ];
+                    pep.Composition =  extract_composition(pep.modifications);
                 }
+                pep.modifications.forEach(function(mod) {
+                    mod[3] = 1;
+                    mod[4] = pep.Sequence.length;
+                });
                 pep.possible_mods = pep.modifications;
                 delete pep.modifications;
             }
@@ -917,6 +1029,7 @@ var combine_all_peptides = function(peps) {
         var first_pep = peps[0];
         var quant = null;
         var high_sn = false;
+        var has_possible_mods = false;
         var hexnac_type = {};
         peps.forEach(function(pep) {
             if ("CalculatedRatio" in pep) {
@@ -934,6 +1047,9 @@ var combine_all_peptides = function(peps) {
                 if (("GlcNAc" in hexnac_type || "GalNAc" in hexnac_type)) {
                     delete hexnac_type['Unknown'];
                 }
+            }
+            if ("possible_mods" in pep) {
+                has_possible_mods = true;
             }
         });
         var block = {
@@ -958,6 +1074,11 @@ var combine_all_peptides = function(peps) {
             var count = 0;
             block.composition = [ [first_pep.modifications.map(function(site) { count += 1; return site[1]; })[0], count ].reverse().join('x') ];
         }
+
+        //Object.keys(global_datablock).forEach(function(prot) { var ml = global_datablock[prot].filter( function(pep) { return (pep.ambiguous_mods || []).length > 1; }).length; if (ml > 0) console.log(prot); });
+        if (has_possible_mods) {
+            block.ambiguous_mods = peps.map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);
+        }
         first_pep.uniprot.forEach(function(uniprot) {
             if ( ! data[uniprot] ) {
                 data[uniprot] = [];
@@ -968,6 +1089,24 @@ var combine_all_peptides = function(peps) {
     return data;
 };
 
+
+var write_possible_mods = function(mods) {
+    var mod_compositions = {};
+    return mods.sort(function(a,b) {
+        var sort_val_a = a[3] ? a[3] : a[0];
+        var sort_val_b = b[3] ? b[3] : b[0];
+        if (sort_val_a == sort_val_b) {
+            sort_val_a = a[4] ? a[4] : a[0];
+            sort_val_b = b[4] ? b[4] : b[0];
+        }
+        return sort_val_a - sort_val_b;
+    }).map(function(mod) {
+        if (mod[3]) {
+            return ""+mod[3]+"-"+mod[4]+"("+mod[1]+")";
+        }
+        return mod[0]+"("+mod[1]+")";
+    }).join(',');
+};
 
 var partial = function(fn) {
     var args = Array.prototype.slice.call(arguments, 1);
@@ -1022,7 +1161,7 @@ var collect_galnac_ratios = function(peps) {
         peps = global_results;
     }
     return peps.filter(function(pep) { return pep.galnac_intensity > 0; }).map(function(pep) { return pep.galnac_intensity / pep.glcnac_intensity; }).join("\t");
-}
+};
 
 
 var global_results = [];
@@ -1066,7 +1205,7 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
                 return peps;
             });
             return result;
-        }).then(function(peps) {
+        }).then(partial(validate_peptide_coverage,db)).then(function(peps) {
             console.log("Got all data");
             global_datablock = combine_all_peptides(peps);
             if (nconf.get('write-peptides')) {
