@@ -290,13 +290,19 @@ var find_dimethyls = function(db,pep) {
 
         } else {
             resolve(dimethyl_count_cache[pep.PeptideID]);
-            // return check_potential_pair(db,pep,dimethyl_count_cache[pep.PeptideID]);
         }
     });
 };
 
 
 var validated_quans_cache = {};
+
+
+/*
+FIXME: Write Unit tests for this section - make up some minimal MSF with the peaks that
+we need to find, and one where there is a singlet. Possible minimal method call where
+we can just grab the pair for a given peptide too?
+*/
 
 var check_potential_pair = function(db,pep,num_dimethyl) {
     return new Promise(function(resolve,reject) {
@@ -703,9 +709,6 @@ var get_ion_matching_config = function(db,pep) {
     });
 };
 
-//get_b_ion_coverage(global_db, global_results.filter(function(pep) { return pep.Sequence == 'LDEEEEDNEGGEWER'; })[0] ).then(function(ions) { console.log(ions.filter(function(ion) { return ion[1].z == 1; })); });
-
-//https://github.com/compomics/thermo-msf-parser/blob/master/thermo_msf_parser_API/src/main/java/com/compomics/thermo_msf_parser_API/highmeminstance/Peptide.java
 var assign_peptide_ions = function(db,pep) {
     return Promise.all( [ get_spectrum(db,pep), get_ion_matching_config(db,pep) ]).then(function(spec_data) {
         var spectrum = spec_data[0];
@@ -731,9 +734,6 @@ var filter_assigned_for_isotope_envelope = function(ions) {
         }
         return false;
     });
-    // return ions.filter(function(ion) {
-    //     return ((ion.peaks || []).length  > 0);
-    // });
 };
 
 var get_b_ion_coverage = function(db,pep) {
@@ -1075,7 +1075,6 @@ var combine_all_peptides = function(peps) {
             block.composition = [ [first_pep.modifications.map(function(site) { count += 1; return site[1]; })[0], count ].reverse().join('x') ];
         }
 
-        //Object.keys(global_datablock).forEach(function(prot) { var ml = global_datablock[prot].filter( function(pep) { return (pep.ambiguous_mods || []).length > 1; }).length; if (ml > 0) console.log(prot); });
         if (has_possible_mods) {
             block.ambiguous_mods = peps.map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);
         }
