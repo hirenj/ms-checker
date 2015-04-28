@@ -6,6 +6,7 @@
     "toolbar": false
   },
   "dependencies": {
+    "ftp": "^0.3.10",
     "nconf": "^0.7.1",
     "optimist": "^0.6.1",
     "sax": "^0.6.1",
@@ -14,7 +15,7 @@
     "xml2js": "^0.4.6",
     "yauzl": "^2.2.1"
   },
-  "devDependencies" : {
-    "heapdump" : "^0.3.5"
+  "devDependencies": {
+    "heapdump": "^0.3.5"
   }
 }
