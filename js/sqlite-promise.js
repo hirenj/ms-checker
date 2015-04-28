@@ -47,7 +47,7 @@
             });
         };
         db.end_statement = function(sql) {
-            if (cached_statements[sql].active_count > 1) {
+            if (cached_statements[sql] && cached_statements[sql].active_count > 1) {
                 cached_statements[sql].active_count -= 1;
                 return;
             }
