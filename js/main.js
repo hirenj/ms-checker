@@ -7,6 +7,8 @@ var fs      = require('fs'),
 
 Math.median = require('../js/math-median').median;
 
+var excel_writer = require('../js/excel.js');
+
 var uniprot_meta = require('../js/uniprot.js');
 
 var promisify_sqlite = require('../js/sqlite-promise');
