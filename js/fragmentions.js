@@ -108,7 +108,6 @@ var assign_peptide_ions = function(db,pep) {
         var spectrum = spec_data[0];
         var ion_filters = spec_data[1];
         if ( ! spectrum ) {
-            debugger;
             return [];
         }
         var theoretical_ions = calculate_fragment_ions(pep,spectrum.charge || 1).filter(function(ion) {
@@ -147,6 +146,18 @@ var get_b_ion_coverage = function(db,pep) {
             }
         }).filter(function(pos) { return pos && pos > 0; }).filter(onlyUnique).sort(function(a,b) { return a-b; });
     });
+};
+
+var theoretical_ions = function(db,pep,charge) {
+    return get_ion_matching_config(db,pep).then(function(ion_filter) {
+        return calculate_fragment_ions(pep,charge || 1).filter(function(ion) {
+            return ! ion_filter(ion.type);
+        });
+    });
+};
+
+var matched_ions = function(db,pep) {
+    return assign_peptide_ions(db,pep).then(filter_assigned_for_isotope_envelope);
 };
 
 var get_coverage_for_sites = function(pep,b_ions) {
@@ -213,7 +224,7 @@ var validate_peptide_coverage = function(db,peptides) {
     exports.emit('task','Validating fragmentation spectra');
     exports.emit('progress',0);
     var count = 0;
-    return Promise.all(peptides.filter(function(pep) { return pep.modifications && pep.modifications.length > 0; }).map(function(pep,idx) {
+    return Promise.all(peptides.filter(function(pep) { return ((pep.activation || "") !== "HCD") && pep.modifications && pep.modifications.length > 0; }).map(function(pep,idx) {
         if (total === null || idx > total) {
             total = idx;
         }
@@ -231,8 +242,6 @@ var validate_peptide_coverage = function(db,peptides) {
     });
 };
 
-
-// calculate_fragment_ions(global_results.filter(function(pep) { return pep.Sequence == 'YSEFFTGSK'; })[0],1);
 
 var calculate_fragment_ions = function(pep,spectrum_charge) {
     var mods = quantitative.modifications_cache[pep.PeptideID] || [];
@@ -272,3 +281,6 @@ var calculate_fragment_ions = function(pep,spectrum_charge) {
 };
 
 exports.validate_peptide_coverage = validate_peptide_coverage;
+exports.matched_ions = matched_ions;
+exports.theoretical_ions = theoretical_ions;
+exports.all_theoretical_ions = calculate_fragment_ions;

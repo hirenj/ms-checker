@@ -74,6 +74,9 @@ var guess_hexnac = function(db,peps) {
         if (self.conf.get('hcd-processing-node')) {
             processing_node = parseInt(self.conf.get('hcd-processing-node'));
         }
+        if ( ! processing_node ) {
+            throw new Error("No Processing node for HCD");
+        }
         console.log("We only want spectra from Processing Node ",processing_node);
         return true;
     });
@@ -91,6 +94,12 @@ var guess_hexnac = function(db,peps) {
         return Promise.all(  to_cut.splice(0,split_length).map(function(pep) {
                                 return spectra.get_spectrum(db,pep,processing_node).then( check_galnac_glcnac_ratio.bind(null,pep) );
                             }) ).then(arguments.callee);
+    }).catch(function(err) {
+        if (err.message === "No Processing node for HCD") {
+            exports.emit('progress',1);
+            return Promise.resolve(peps);
+        }
+        throw err;
     });
     return result;
 };

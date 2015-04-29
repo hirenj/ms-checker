@@ -323,14 +323,11 @@ var produce_peptide_modification_data = function(db,pep) {
 
         if (! peptide_modifications_cache || peptide_modifications_cache.empty ) {
 
-            peptide_modifications_cache = peptide_modifications_cache || {};
-
             delete peptide_modifications_cache['empty'];
 
             exports.emit('task','Population of modifications cache');
             exports.emit('progress',0);
 
-            peptide_modifications_cache = {};
             var last_frac = 0;
             var total_count = 100000000;
             var idx = 0;

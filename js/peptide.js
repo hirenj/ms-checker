@@ -14,6 +14,10 @@ const protein_sequence_sql = 'SELECT \
 FROM Proteins \
 WHERE ProteinID = ?'
 
+var onlyUnique = function(value, index, self) {
+    return self.indexOf(value) === index;
+};
+
 var produce_peptide_data = function(db,pep) {
     return db.do_statement(peptide_metadata_sql, [ pep.PeptideID ]).then(function(pep_datas) {
         if ( ! pep.uniprot ) {
@@ -30,6 +34,24 @@ var produce_peptide_data = function(db,pep) {
         });
     });
 };
+
+var filter_ambiguous_spectra = function(all_peps) {
+    var peptides_by_spectrum = {};
+    var bad_spectra = [];
+    all_peps.forEach(function(pep) {
+        if ( ! peptides_by_spectrum[pep.SpectrumID]) {
+            peptides_by_spectrum[pep.SpectrumID] = [];
+        }
+        peptides_by_spectrum[pep.SpectrumID].push(pep);
+    });
+    Object.keys(peptides_by_spectrum).forEach(function(spectrumID) {
+        var peps = peptides_by_spectrum[spectrumID];
+        if (peps.map(function(pep) { return pep.Sequence; }).filter(onlyUnique).length > 1) {
+            bad_spectra.push(parseInt(spectrumID));
+        }
+    });
+    return all_peps.filter(function(pep) { return bad_spectra.indexOf(pep.SpectrumID) < 0; });
+}
 
 var extract_composition = function(mods) {
     var compositions = {};
@@ -78,3 +100,4 @@ exports.composition = extract_composition;
 exports.combine = combiner.combine;
 exports.modification_key = modification_key;
 exports.fix_site_numbers = fix_ids;
+exports.filter_ambiguous_spectra = filter_ambiguous_spectra;
