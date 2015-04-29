@@ -45,6 +45,9 @@ var combine_all_peptides = function(peps) {
                 if ( ! pep.modifications ) {
                     return;
                 }
+                if (mods.length > 1) {
+                    console.log("We have multiple site assignment possibilities for a spectrum, and they haven't been removed by the fragmentation checker ",mods,peps,pep.modification_peptides);
+                }
                 pep.modifications.forEach(function(mod) {
                     mod[3] = 1;
                     mod[4] = pep.Sequence.length;
