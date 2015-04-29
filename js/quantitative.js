@@ -67,7 +67,7 @@ WHERE \
 UNION \
 \
 SELECT \
-    PeptideID, 0, ModificationName, DeltaMass \
+    PeptideID, -1, ModificationName, DeltaMass \
 FROM PeptidesTerminalModifications \
     LEFT JOIN AminoAcidModifications ON PeptidesTerminalModifications.TerminalModificationID = AminoAcidModifications.AminoAcidModificationID \
 WHERE \
@@ -341,7 +341,7 @@ var produce_peptide_modification_data = function(db,pep) {
                 idx += 1;
                 var frac = parseFloat((idx/total_count).toFixed(2));
                 peptide_modifications_cache[mods.PeptideID] =  peptide_modifications_cache[mods.PeptideID] || [];
-                peptide_modifications_cache[mods.PeptideID].push([ mods.Position + 1, mods.ModificationName, mods.DeltaMass ]);
+                peptide_modifications_cache[mods.PeptideID].push([ mods.Position < 0 ? 1 : mods.Position + 1, mods.ModificationName, mods.DeltaMass ]);
                 if (frac !== last_frac) {
                     exports.emit('progress',frac);
                     last_frac = frac;

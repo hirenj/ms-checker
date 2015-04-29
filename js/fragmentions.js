@@ -103,13 +103,17 @@ var get_ion_matching_config = function(db,pep) {
     });
 };
 
-var assign_peptide_ions = function(db,pep) {
+var assign_peptide_ions = function(db,pep,debug) {
     return Promise.all( [ spectra.get_spectrum(db,pep), get_ion_matching_config(db,pep) ]).then(function(spec_data) {
         var spectrum = spec_data[0];
         var ion_filters = spec_data[1];
+        if (debug) {
+            debugger;
+        }
         if ( ! spectrum ) {
             return [];
         }
+
         var theoretical_ions = calculate_fragment_ions(pep,spectrum.charge || 1).filter(function(ion) {
             return ! ion_filters(ion.type);
         });
@@ -156,8 +160,8 @@ var theoretical_ions = function(db,pep,charge) {
     });
 };
 
-var matched_ions = function(db,pep) {
-    return assign_peptide_ions(db,pep).then(filter_assigned_for_isotope_envelope);
+var matched_ions = function(db,pep,debug) {
+    return assign_peptide_ions(db,pep,debug).then(filter_assigned_for_isotope_envelope);
 };
 
 var get_coverage_for_sites = function(pep,b_ions) {
@@ -242,11 +246,17 @@ var validate_peptide_coverage = function(db,peptides) {
     });
 };
 
+var sum_mods = function(array,idx) {
+    if (array.length == 0) {
+        return 0;
+    }
+    // Should we have unique masses here?
+    return array.filter(function(mod) { return mod[0] === idx; }).map(function(mod) { return mod[2]; }).reduce(function(curr,next) { return curr + next; },0);
+};
 
 var calculate_fragment_ions = function(pep,spectrum_charge) {
     var mods = quantitative.modifications_cache[pep.PeptideID] || [];
-    var null_mass = [0,0,0];
-    var masses = pep.Sequence.split('').map(function(aa,idx) { return MASS_AMINO_ACIDS[aa] + (mods.filter(function(mod) { return mod[0] === (idx + 1); })[0] || null_mass)[2];  });
+    var masses = pep.Sequence.split('').map(function(aa,idx) { return MASS_AMINO_ACIDS[aa] + sum_mods(mods,idx+1);  });
     var ions = [];
     var charge = spectrum_charge;
     var b_ion_base, y_ion_base;
@@ -267,12 +277,18 @@ var calculate_fragment_ions = function(pep,spectrum_charge) {
             { 'type' : 'a_nh3_'+(i+1), 'mz' : (b_ion_base - MASS_O - MASS_C - MASS_N - 3 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'a_h20_'+(i+1), 'mz' : (b_ion_base - 2*MASS_O - MASS_C - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'c'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'c_+1_'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H + MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'c_-1_'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H - MASS_H + charge * MASS_H) / charge, 'z' : charge },
+
 
             { 'type' : 'y'+(i+1), 'mz' : (y_ion_base + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'y_nh3_'+(i+1), 'mz' : (y_ion_base - MASS_N - 3 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'y_h2o_'+(i+1), 'mz' : (y_ion_base - 2* MASS_H - MASS_O + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'x'+(i+1), 'mz' : (y_ion_base + MASS_C + MASS_O - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
-            { 'type' : 'z'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge }
+            { 'type' : 'z'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'z_+1_'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H + MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'z_-1_'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H - MASS_H + charge * MASS_H) / charge, 'z' : charge }
+
             ]);
         }
         charge -= 1;

@@ -77,11 +77,13 @@ var modification_key = function(pep) {
 
 var fix_ids = function(pep) {
     if (pep.modifications) {
+        pep.modifications = pep.modifications.map(function(mod) { return [].concat(mod); });
         pep.modifications.forEach(function(mod) {
             mod[0] = pep.pep_start + mod[0];
         });
     }
     if (pep.possible_mods) {
+        pep.possible_mods = pep.possible_mods.map(function(mod) { return [].concat(mod); });
         pep.possible_mods.forEach(function(mod) {
             mod[0] = pep.pep_start + mod[0];
             if (mod[3]) {
