@@ -4,11 +4,11 @@
         db.all = function(sql,vals) {
             var args = Array.prototype.splice.call(arguments);
             return new Promise(function(resolve,reject) {
-                old_all.call(db,sql,vals,function(err,vals) {
+                old_all.call(db,sql,vals,function(err,out_vals) {
                     if (err) {
                         reject(err);
                     } else {
-                        resolve(vals);
+                        resolve(out_vals);
                     }
                 });
             });
