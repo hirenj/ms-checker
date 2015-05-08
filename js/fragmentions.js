@@ -279,6 +279,10 @@ var calculate_fragment_ions = function(pep,spectrum_charge) {
             { 'type' : 'c'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'c_+1_'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H + MASS_H + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'c_-1_'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H - MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'c_+2_'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H + 2*MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'c_-2_'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H - 2*MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'c_+3_'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H + 3*MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'c_-3_'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H - 3*MASS_H + charge * MASS_H) / charge, 'z' : charge },
 
 
             { 'type' : 'y'+(i+1), 'mz' : (y_ion_base + charge * MASS_H) / charge, 'z' : charge },
@@ -287,7 +291,11 @@ var calculate_fragment_ions = function(pep,spectrum_charge) {
             { 'type' : 'x'+(i+1), 'mz' : (y_ion_base + MASS_C + MASS_O - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'z'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
             { 'type' : 'z_+1_'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H + MASS_H + charge * MASS_H) / charge, 'z' : charge },
-            { 'type' : 'z_-1_'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H - MASS_H + charge * MASS_H) / charge, 'z' : charge }
+            { 'type' : 'z_-1_'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H - MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'z_+2_'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H + 2*MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'z_-2_'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H - 2*MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'z_+3_'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H + 3*MASS_H + charge * MASS_H) / charge, 'z' : charge },
+            { 'type' : 'z_-3_'+(i+1), 'mz' : (y_ion_base - MASS_N - 2 * MASS_H - 3*MASS_H + charge * MASS_H) / charge, 'z' : charge }
 
             ]);
         }
