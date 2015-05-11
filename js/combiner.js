@@ -151,6 +151,8 @@ var combine_all_peptides = function(peps) {
         var high_sn = false;
         var has_possible_mods = false;
         var hexnac_type = {};
+        var max_score = null;
+
         peps.forEach(function(pep) {
             if ("CalculatedRatio" in pep) {
                 quant = pep.CalculatedRatio;
@@ -171,6 +173,9 @@ var combine_all_peptides = function(peps) {
             if ("possible_mods" in pep) {
                 has_possible_mods = true;
             }
+            if (pep.score && max_score == null || pep.score > max_score) {
+                max_score = pep.score;
+            }
         });
         var block = {
             'multi_protein' : false,
@@ -188,6 +193,11 @@ var combine_all_peptides = function(peps) {
         if (first_pep.modifications) {
             block.sites = first_pep.modifications;
         }
+
+        if (max_score !== null) {
+            block.score = max_score;
+        }
+
         if (first_pep.Composition) {
             block.composition = first_pep.Composition;
             if (block.composition.length > 1) {

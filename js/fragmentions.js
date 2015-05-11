@@ -223,22 +223,36 @@ var resolve_modifications = function(pep,aa_re) {
     return pep;
 };
 
+var batch_promise = function(list,split,mapper) {
+    exports.emit('progress',0);
+    var total = list.length;
+    var to_cut = [].concat(list);
+    var result = Promise.resolve(true);
+
+    result = result.then(function() {
+        exports.emit('progress',  parseFloat((1 - (to_cut.length / total )).toFixed(2)));
+
+        if (to_cut.length < 1) {
+            return list;
+        }
+        return Promise.all( to_cut.splice(0,split).map(mapper) ).then(arguments.callee);
+    });
+
+    return result;
+};
+
 var validate_peptide_coverage = function(db,peptides) {
     var total = null;
     exports.emit('task','Validating fragmentation spectra');
-    exports.emit('progress',0);
-    var count = 0;
-    return Promise.all(peptides.filter(function(pep) { return ((pep.activation || "") !== "HCD") && pep.modifications && pep.modifications.length > 0; }).map(function(pep,idx) {
-        if (total === null || idx > total) {
-            total = idx;
-        }
+
+    var wanted_peptides = peptides.filter(function(pep) { return ((pep.activation || "") !== "HCD") && pep.modifications && pep.modifications.length > 0; });
+
+    return batch_promise(wanted_peptides,50,function(pep,idx) {
         return get_b_ion_coverage(db,pep).then(function(ions) {
             pep.modification_peptides = get_coverage_for_sites(pep,ions);
-            count += 1;
-            exports.emit('progress', parseFloat( 0.9*( count/(total+1) ).toFixed(2) ) );
             return pep;
         });
-    })).then(function(modified_peps) {
+    }).then(function(modified_peps) {
         modified_peps.forEach(resolve_glyco_modifications);
         exports.emit('progress',1);
     }).then(function() {

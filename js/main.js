@@ -23,7 +23,7 @@ var peptide = require('../js/peptide');
 ambiguous.conf = nconf;
 hexnac_hcd.conf = nconf;
 
-[quantitative,ambiguous,hexnac_hcd,fragmentation].forEach(function(module) {
+[quantitative,ambiguous,hexnac_hcd,fragmentation,peptide].forEach(function(module) {
     module.on('task',function(desc) {
         console.log(module.constructor.name,desc);
         this.addListener('progress',function(percentage) {
@@ -130,17 +130,16 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
     var quant_promise = quantitative.init_caches(db).then(function() {
          return quantitative.retrieve_quantified_peptides(db).then(partial(quantitative.check_quantified_peptides,db));
     });
-    var ambig_promise = ambiguous.retrieve_peptides(db);
+    var ambig_promise = ambiguous.retrieve_peptides(db).then(function(peps) { return peps? peps : []; });
 
     var processing_promise = Promise.all([quant_promise,ambig_promise]).then(function(all_peps) {
         var merged = Array.prototype.concat.apply([], all_peps);
         return merged;
-    }).then(peptide.filter_ambiguous_spectra).then(hexnac_hcd.guess_hexnac.bind(hexnac_hcd,db)).then(partial(fragmentation.validate_peptide_coverage,db));
+    }).then(peptide.filter_ambiguous_spectra).then(peptide.produce_peptide_scores_and_cleanup.bind(peptide,db)).then(hexnac_hcd.guess_hexnac.bind(hexnac_hcd,db)).then(partial(fragmentation.validate_peptide_coverage,db));
 
     processing_promise.then(function(peps) {
         global_results = peps;
         uniprot_meta.init().then(function() {
-            console.log(global_datablock);
             global_datablock = peptide.combine(peps);
         });
     }).catch(console.error);

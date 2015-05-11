@@ -1,4 +1,4 @@
-var combiner = require('./combiner');
+var util = require('util');
 
 const peptide_metadata_sql = 'SELECT \
     Description, \
@@ -14,9 +14,67 @@ const protein_sequence_sql = 'SELECT \
 FROM Proteins \
 WHERE ProteinID = ?'
 
+const peptide_score_sql = 'SELECT \
+    PeptideID, \
+    ScoreValue \
+FROM PeptideScores';
+
+const peptide_score_count_sql = 'SELECT count(*) as count from PeptideScores';
+
+var Peptide = function Peptide() {
+
+};
+
+util.inherits(Peptide,require('events').EventEmitter);
+
+module.exports = exports = new Peptide();
+
 var onlyUnique = function(value, index, self) {
     return self.indexOf(value) === index;
 };
+
+var peptide_scores_cache = {'empty' : true};
+
+var produce_peptide_score_data = function(db,pep) {
+    return new Promise(function(resolve,reject) {
+
+        if (! peptide_scores_cache || peptide_scores_cache.empty ) {
+
+            delete peptide_scores_cache['empty'];
+
+            exports.emit('task','Population of peptide scores');
+            exports.emit('progress',0);
+            var last_frac = 0;
+            var total_count = 100000000;
+            var idx = 0;
+
+            db.all(peptide_score_count_sql).then(function(rows) {
+                if (rows.length > 1) {
+                    total_count = rows[0].count;
+                }
+            });
+            db.each(peptide_score_sql,[],function(err,score) {
+                peptide_scores_cache[score.PeptideID] = score.ScoreValue;
+                idx += 1;
+                var frac = parseFloat((idx/total_count).toFixed(2));
+                if (frac !== last_frac) {
+                    exports.emit('progress',frac);
+                    last_frac = frac;
+                }
+            }).then(function() {
+                exports.emit('progress',1);
+                if ( ! pep.PeptideID ) {
+                    resolve();
+                } else {
+                    resolve(produce_peptide_score_data(db,pep));
+                }
+            });
+        } else {
+            resolve(peptide_scores_cache[pep.PeptideID]);
+        }
+    });
+};
+
 
 var produce_peptide_data = function(db,pep) {
     return db.do_statement(peptide_metadata_sql, [ pep.PeptideID ]).then(function(pep_datas) {
@@ -33,6 +91,15 @@ var produce_peptide_data = function(db,pep) {
             }
         });
     });
+};
+
+var produce_peptide_scores = function(db,peps) {
+    return Promise.all(peps.map(function(pep) {
+        return produce_peptide_score_data(db,pep).then(function(score) {
+            pep.score = score;
+            return pep;
+        });
+    }));
 };
 
 var filter_ambiguous_spectra = function(all_peps) {
@@ -94,12 +161,28 @@ var fix_ids = function(pep) {
     }
 };
 
+var init_caches = function(db) {
+    return produce_peptide_score_data(db,{});
+};
+
+exports.init_caches = init_caches;
 exports.produce_peptide_data = produce_peptide_data;
+exports.produce_peptide_scores = produce_peptide_scores;
+exports.produce_peptide_scores_and_cleanup = function(db,peps) {
+    return init_caches(db).then(function() {
+        return produce_peptide_scores(db,peps);
+    }).then(function(peps) {
+        peptide_scores_cache = {'empty' : true};
+        return peps;
+    });
+};
 exports.cleanup = function(db) {
     db.end_statement(peptide_metadata_sql);
 };
 exports.composition = extract_composition;
-exports.combine = combiner.combine;
+exports.combine = function(peps) {
+    return require('./combiner').combine(peps);
+}
 exports.modification_key = modification_key;
 exports.fix_site_numbers = fix_ids;
 exports.filter_ambiguous_spectra = filter_ambiguous_spectra;
