@@ -17,6 +17,7 @@ var quantitative = require('../js/quantitative');
 var ambiguous = require('../js/ambiguous');
 var hexnac_hcd = require('../js/hexnac_hcd');
 var fragmentation = require('../js/fragmentions');
+var metadata = require('../js/metadata');
 
 var peptide = require('../js/peptide');
 
@@ -114,7 +115,7 @@ var collect_galnac_ratios = function(peps) {
 };
 
 var global_results = [];
-var global_datablock;
+var global_datablock = {'data' : {}, 'metadata' : {}};
 
 // Load native UI library
 var gui = require('nw.gui');
@@ -126,7 +127,9 @@ console.log(gui.App.argv);
 var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(err) {
 
     promisify_sqlite(db);
-
+    metadata.get_metadata(db).then(function(meta) {
+        global_datablock.metadata = meta;
+    });
     var quant_promise = quantitative.init_caches(db).then(function() {
          return quantitative.retrieve_quantified_peptides(db).then(partial(quantitative.check_quantified_peptides,db));
     });
@@ -140,7 +143,7 @@ var db = new sqlite3.Database(files_to_open[0],sqlite3.OPEN_READONLY,function(er
     processing_promise.then(function(peps) {
         global_results = peps;
         uniprot_meta.init().then(function() {
-            global_datablock = peptide.combine(peps);
+            global_datablock.data = peptide.combine(peps);
         });
     }).catch(console.error);
 
