@@ -1,7 +1,5 @@
 var yauzl   = require('yauzl'),
-    sax     = require('sax'),
-    xml2js  = require('xml2js'),
-    saxpath = require('saxpath');
+    byline  = require('byline');
 
 const hcd_processing_node_number_sql = 'SELECT \
     ProcessingNodeNumber \
@@ -68,6 +66,72 @@ var unzip_spectrum = function(spectrum_text) {
 };
 
 var parse_spectrum = function(readStream) {
+    var stream = byline.createStream(readStream);
+
+    var in_scan_event = false;
+    var in_peak_centroids = false;
+    var spectrum_object = {};
+    spectrum_object.peaks = [];
+
+    var result = new Promise(function(resolve,reject) {
+        readStream.on('end', function() {
+            resolve( spectrum_object );
+        });
+    });
+
+    stream.on('readable', function() {
+        var line;
+        while (null !== (line = stream.read())) {
+            line = line.toString().trim();
+            if (line == '<ScanEvent>') {
+                in_scan_event = true;
+            }
+            if (line == '</ScanEvent>') {
+                in_scan_event = false;
+            }
+            if (! spectrum_object.activation && in_scan_event && line.indexOf('ActivationTypes') >= 0 ) {
+                spectrum_object.activation = line.match(/>(.+)</)[1];
+            }
+            if (line == '<PeakCentroids>') {
+                in_peak_centroids = true;
+            }
+            if (line == '</PeakCentroids>') {
+                in_peak_centroids = false;
+            }
+            if (in_peak_centroids && line.indexOf('Peak ') >= 0) {
+                var peak = {};
+                line.split(/\s+/).filter(function(attr) { return attr.indexOf('=') >= 0; }).forEach(function(attr) {
+                    var vals = attr.split('=');
+                    var attname = vals[0];
+                    var value = vals[1];
+                    value = value.replace(/"/g,'');
+                    if (attname == 'X') {
+                        peak.mass = parseFloat(value);
+                    }
+                    if (attname == 'Y') {
+                        peak.intensity = parseFloat(value);
+                    }
+                    if (attname == 'Z') {
+                        peak.charge = parseFloat(value);
+                    }
+                    if (attname == 'SN') {
+                        peak.sn = parseFloat(value);
+                    }
+                });
+                spectrum_object.peaks.push(peak);
+            }
+        }
+    });
+
+    return result;
+};
+
+
+var parse_spectrum_xml = function(readStream) {
+
+    var sax     = require('sax'),
+    xml2js  = require('xml2js'),
+    saxpath = require('saxpath');
 
     var saxParser = sax.createStream(true);
     var peak_stream = new saxpath.SaXPath(saxParser, '//PeakCentroids/Peak');

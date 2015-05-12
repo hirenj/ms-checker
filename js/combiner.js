@@ -191,7 +191,7 @@ var combine_all_peptides = function(peps) {
             block.hexnac_type = Object.keys(hexnac_type);
         }
         if (first_pep.modifications) {
-            block.sites = first_pep.modifications;
+            block.sites = first_pep.modifications.map(function(mod) { return [ mod[0], mod[1] ]; } );
         }
 
         if (max_score !== null) {
@@ -199,13 +199,13 @@ var combine_all_peptides = function(peps) {
         }
 
         if (first_pep.Composition) {
-            block.composition = first_pep.Composition;
-            if (block.composition.length > 1) {
+            block.composition = first_pep.Composition[0];
+            if (first_pep.Composition.length > 1) {
                 debugger;
             }
         } else if (first_pep.modifications) {
             var count = 0;
-            block.composition = [ [first_pep.modifications.map(function(site) { count += 1; return site[1]; })[0], count ].reverse().join('x') ];
+            block.composition = [first_pep.modifications.map(function(site) { count += 1; return site[1]; })[0], count ].reverse().join('x');
         }
 
         block.peptide_start = first_pep.pep_start + 1;

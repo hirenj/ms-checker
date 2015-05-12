@@ -244,6 +244,7 @@ var batch_promise = function(list,split,mapper) {
 var validate_peptide_coverage = function(db,peptides) {
     var self = this;
     var total = null;
+    console.time('Fragmentation');
     exports.notify_task('Validating fragmentation spectra');
 
     var wanted_peptides = peptides.filter(function(pep) { return ((pep.activation || "") !== "HCD") && pep.modifications && pep.modifications.length > 0; });
@@ -254,6 +255,7 @@ var validate_peptide_coverage = function(db,peptides) {
             return pep;
         });
     }).then(function(modified_peps) {
+        console.timeEnd('Fragmentation');
         modified_peps.forEach(resolve_glyco_modifications);
         exports.notify_progress('progress',1,1);
     }).then(function() {

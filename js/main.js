@@ -21,6 +21,8 @@ var metadata = require('../js/metadata');
 
 var peptide = require('../js/peptide');
 
+var spectra = require('../js/spectrum');
+
 ambiguous.conf = nconf;
 hexnac_hcd.conf = nconf;
 
