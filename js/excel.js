@@ -25,7 +25,7 @@ var write_excel_file = function(datablock,filename) {
     			data.push(null);
     		}
     		data.push(pep.sequence);
-    		data.push(pep.composition[0]);
+               data.push(pep.composition);
     		if (pep.sites) {
     			pep.sites.forEach(function(site) {
     				rows.push(data.concat([site[0]]));
