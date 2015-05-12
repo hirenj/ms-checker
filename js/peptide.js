@@ -25,7 +25,7 @@ var Peptide = function Peptide() {
 
 };
 
-util.inherits(Peptide,require('events').EventEmitter);
+util.inherits(Peptide,require('./processing-step.js'));
 
 module.exports = exports = new Peptide();
 
@@ -36,15 +36,16 @@ var onlyUnique = function(value, index, self) {
 var peptide_scores_cache = {'empty' : true};
 
 var produce_peptide_score_data = function(db,pep) {
+    var self = this;
     return new Promise(function(resolve,reject) {
 
         if (! peptide_scores_cache || peptide_scores_cache.empty ) {
 
             delete peptide_scores_cache['empty'];
 
-            exports.emit('task','Population of peptide scores');
-            exports.emit('progress',0);
-            var last_frac = 0;
+            exports.notify_task('Population of peptide scores');
+            exports.notify_progress(0,1);
+
             var total_count = 100000000;
             var idx = 0;
 
@@ -56,13 +57,9 @@ var produce_peptide_score_data = function(db,pep) {
             db.each(peptide_score_sql,[],function(err,score) {
                 peptide_scores_cache[score.PeptideID] = score.ScoreValue;
                 idx += 1;
-                var frac = parseFloat((idx/total_count).toFixed(2));
-                if (frac !== last_frac) {
-                    exports.emit('progress',frac);
-                    last_frac = frac;
-                }
+                exports.notify_progress(idx,total_count);
             }).then(function() {
-                exports.emit('progress',1);
+                exports.notify_progress(total_count,total_count);
                 if ( ! pep.PeptideID ) {
                     resolve();
                 } else {

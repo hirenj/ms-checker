@@ -7,7 +7,7 @@ var Quantitative = function Quantitative() {
 
 };
 
-util.inherits(Quantitative,require('events').EventEmitter);
+util.inherits(Quantitative,require('./processing-step.js'));
 
 module.exports = exports = new Quantitative();
 
@@ -123,25 +123,20 @@ var find_dimethyls = function(db,pep) {
         if (! dimethyl_count_cache ) {
 
             dimethyl_count_cache = {};
-            exports.emit('task','Populating Dimethyl cache');
-            exports.emit('progress',0);
+            exports.notify_task('Populating Dimethyl cache');
+            exports.notify_progress(0,1);
             dimethyl_count_cache = {};
             var total_count = 1000000;
             var idx = 0;
             db.all(dimethyl_total_count_sql).then(function(count) {
                 total_count = count[0].count;
             });
-            var last_frac = 0;
             db.each(dimethyl_counts_sql,[],function(err,count) {
                 idx += 1;
-                frac = parseFloat( (idx / total_count).toFixed(2) );
-                if (frac !== last_frac) {
-                    last_frac = frac;
-                    exports.emit('progress',frac );
-                }
+                exports.notify_progress(idx,total_count);
                 dimethyl_count_cache[count.PeptideID] = count.count+1;
             }).then(function(data) {
-                exports.emit('progress',1);
+                exports.notify_progress(total_count,total_count);
 
                 if ( ! pep.QuanResultID ) {
                     resolve();
@@ -258,9 +253,8 @@ var combine_quantified_peptides = function(peps) {
 
 var retrieve_quantified_peptides = function(db) {
     var peps = [];
-    exports.emit('task','Retrieving quantified peptides');
-    exports.emit('progress',0);
-    var last_frac = 0;
+    exports.notify_task('Retrieving quantified peptides');
+    exports.notify_progress(0,1);
     var total_count = 100000;
     var idx = 0;
     db.all(search_peptides_count_sql).then(function(count) {
@@ -268,14 +262,10 @@ var retrieve_quantified_peptides = function(db) {
     });
     return db.each(search_peptides_sql,[],function(err,pep) {
         idx += 1;
-        var frac = parseFloat((idx/total_count).toFixed(2));
         peps.push(pep);
-        if (frac !== last_frac) {
-            exports.emit('progress',frac);
-            last_frac = frac;
-        }
+        exports.notify_progress(idx,total_count);
     }).then(function() {
-        exports.emit('progress',1);
+        exports.notify_progress(total_count,total_count);
         return peps;
     });
 };
@@ -285,15 +275,10 @@ var onlyUnique = function(value, index, self) {
 };
 
 var check_quantified_peptides = function(db,peps) {
-    var last_frac = 0;
     var idx = 0;
     var update_fractions = function(pep) {
         idx += 1;
-        var frac = parseFloat((idx / total_peps).toFixed(2));
-        if ( frac !== last_frac ) {
-            exports.emit('progress',frac);
-            last_frac = frac;
-        }
+        exports.notify_progress(idx,total_peps);
     };
 
     var combined_peps = combine_quantified_peptides(peps);
@@ -301,18 +286,16 @@ var check_quantified_peptides = function(db,peps) {
     var singlet_peps = combined_peps.filter( function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; } );
     var total_peps = singlet_peps.length + combined_peps.length;
 
-    exports.emit('task','Validating quantified peptides');
-    exports.emit('progress',0);
+    exports.notify_task('Validating quantified peptides');
+    exports.notify_progress(0,total_peps);
 
     var pair_promises = singlet_peps.map( function(pep) { return check_potential_pair(db,pep,null).then(update_fractions); } );
     var metadata_promises = combined_peps.map( function(pep) { return peptide_search.produce_peptide_data(db,pep).then( produce_peptide_modification_data(db,pep) ).then(update_fractions);  } );
 
     return Promise.all(pair_promises.concat(metadata_promises)).then(function() {
         peptide_search.cleanup(db);
-        exports.emit('progress',1);
+        exports.notify_progress(total_peps,total_peps);
         return combined_peps;
-    }).catch(function(err) {
-        console.log(err);
     });
 };
 
@@ -325,10 +308,9 @@ var produce_peptide_modification_data = function(db,pep) {
 
             delete peptide_modifications_cache['empty'];
 
-            exports.emit('task','Population of modifications cache');
-            exports.emit('progress',0);
+            exports.notify_task('Population of modifications cache');
+            exports.notify_progress(0,1);
 
-            var last_frac = 0;
             var total_count = 100000000;
             var idx = 0;
 
@@ -339,15 +321,11 @@ var produce_peptide_modification_data = function(db,pep) {
             });
             db.each(all_peptide_modifications_sql,[],function(err,mods) {
                 idx += 1;
-                var frac = parseFloat((idx/total_count).toFixed(2));
                 peptide_modifications_cache[mods.PeptideID] =  peptide_modifications_cache[mods.PeptideID] || [];
                 peptide_modifications_cache[mods.PeptideID].push([ mods.Position < 0 ? 1 : mods.Position + 1, mods.ModificationName, mods.DeltaMass ]);
-                if (frac !== last_frac) {
-                    exports.emit('progress',frac);
-                    last_frac = frac;
-                }
+                exports.notify_progress(idx,total_count);
             }).then(function() {
-                exports.emit('progress',1);
+                exports.notify_progress(total_count,total_count);
                 if ( ! pep.PeptideID ) {
                     resolve();
                 } else {

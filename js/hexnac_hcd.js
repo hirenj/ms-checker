@@ -4,7 +4,7 @@ var spectra = require('./spectrum');
 var HexNAcHCD = function HexNAcHCD() {
 };
 
-util.inherits(HexNAcHCD,require('events').EventEmitter);
+util.inherits(HexNAcHCD,require('./processing-step.js'));
 
 module.exports = exports = new HexNAcHCD();
 
@@ -82,11 +82,13 @@ var guess_hexnac = function(db,peps) {
     });
     var split_length = 50;
 
-    exports.emit('task','Processing HexNAc HCD spectra');
-    exports.emit('progress',0);
+    self.notify_task('Processing HexNAc HCD spectra');
+    self.notify_progress(0,1);
+
     var total = peps.length;
     result = result.then(function() {
-        exports.emit('progress',  parseFloat((1 - (to_cut.length / total )).toFixed(2)));
+
+        self.notify_progress(total-to_cut.length,total);
 
         if (to_cut.length < 1) {
             return peps;
@@ -96,7 +98,7 @@ var guess_hexnac = function(db,peps) {
                             }) ).then(arguments.callee);
     }).catch(function(err) {
         if (err.message === "No Processing node for HCD") {
-            exports.emit('progress',1);
+            self.notify_progress(1,1);
             return Promise.resolve(peps);
         }
         throw err;

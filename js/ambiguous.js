@@ -5,7 +5,7 @@ var Ambiguous = function Ambiguous() {
 
 };
 
-util.inherits(Ambiguous,require('events').EventEmitter);
+util.inherits(Ambiguous,require('./processing-step.js'));
 
 module.exports = exports = new Ambiguous();
 
@@ -39,29 +39,25 @@ FROM FileInfos \
 
 
 var retrieve_ambiguous_peptides = function(db) {
+    var self = this;
     var sql = this.conf.get("match-all-ambiguous") ? retrieve_ambiguous_peptides_sql : retrieve_ambiguous_peptides_glyco_sql;
 
-    exports.emit('task','Finding ambiguous peptides');
-    exports.emit('progress',0);
+    self.notify_task('Finding ambiguous peptides');
+    self.notify_progress(0,1);
     return db.all(sql).then(function(peps) {
-        exports.emit('progress',1);
-        exports.emit('task','Populating peptide metadata');
-        exports.emit('progress',0);
+        self.notify_progress(1,1);
+        self.notify_task('Populating peptide metadata');
+        self.notify_progress(0,peps.length);
 
-        var last_frac = 0;
         var idx = 0;
         var update_fractions = function(pep) {
             idx += 1;
-            var frac = parseFloat((idx / total_peps).toFixed(2));
-            if ( frac !== last_frac ) {
-                exports.emit('progress',frac);
-                last_frac = frac;
-            }
+            self.notify_progress(idx,peps.length);
         };
 
         total_peps = peps.length;
         return Promise.all( peps.length > 0 ? peps.map(function(pep) { return peptide_search.produce_peptide_data(db,pep).then(update_fractions); }) : [true] ).then(function() {
-            exports.emit('progress',1);
+            self.notify_progress('progress',peps.length,peps.length);
             peptide_search.cleanup(db);
             peps.forEach(function(pep) {
                 var composition = (pep.FileName || "").match(/\d+\x.+(?=\.mgf)/);

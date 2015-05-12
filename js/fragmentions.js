@@ -45,7 +45,7 @@ AND \
 var FragmentIons = function FragmentIons() {
 };
 
-util.inherits(FragmentIons,require('events').EventEmitter);
+util.inherits(FragmentIons,require('./processing-step.js'));
 
 module.exports = exports = new FragmentIons();
 
@@ -224,13 +224,13 @@ var resolve_modifications = function(pep,aa_re) {
 };
 
 var batch_promise = function(list,split,mapper) {
-    exports.emit('progress',0);
+    exports.notify_progress(0,1);
     var total = list.length;
     var to_cut = [].concat(list);
     var result = Promise.resolve(true);
 
     result = result.then(function() {
-        exports.emit('progress',  parseFloat((1 - (to_cut.length / total )).toFixed(2)));
+        exports.notify_progress( (total - to_cut.length), total );
 
         if (to_cut.length < 1) {
             return list;
@@ -242,8 +242,9 @@ var batch_promise = function(list,split,mapper) {
 };
 
 var validate_peptide_coverage = function(db,peptides) {
+    var self = this;
     var total = null;
-    exports.emit('task','Validating fragmentation spectra');
+    exports.notify_task('Validating fragmentation spectra');
 
     var wanted_peptides = peptides.filter(function(pep) { return ((pep.activation || "") !== "HCD") && pep.modifications && pep.modifications.length > 0; });
 
@@ -254,7 +255,7 @@ var validate_peptide_coverage = function(db,peptides) {
         });
     }).then(function(modified_peps) {
         modified_peps.forEach(resolve_glyco_modifications);
-        exports.emit('progress',1);
+        exports.notify_progress('progress',1,1);
     }).then(function() {
         return peptides;
     });
