@@ -8,6 +8,8 @@ const pd_metadata_sql = "SELECT SoftwareVersion, Date FROM SchemaInfo";
 
 const score_type_sql = 'SELECT ScoreID, ScoreName, Description FROM ProcessingNodeScores';
 
+const MSDATA_FORMAT_VERSION = "1";
+
 var get_raw_filenames = function(db,metadata){
     var raw_filenames = [];
     return db.each(raw_files_sql,[],function(err,file) {
@@ -73,7 +75,9 @@ var get_score_metadata = function(db,metadata) {
 };
 
 var populate_metadata = function(db) {
-    var metadata = {};
+    var metadata = {
+        'msdata-version' : MSDATA_FORMAT_VERSION 
+    };
 
     return Promise.all( [ get_raw_filenames(db,metadata),
     get_fasta_filenames(db,metadata),
