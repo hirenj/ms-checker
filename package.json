@@ -18,6 +18,8 @@
     "yauzl": "^2.2.1"
   },
   "devDependencies": {
+    "grunt": "^0.4.5",
+    "grunt-git-describe": "^2.3.2",
     "heapdump": "^0.3.5"
   }
 }
