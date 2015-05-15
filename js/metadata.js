@@ -50,7 +50,6 @@ var get_self_version = function(metadata) {
     return new Promise(function(resolve,reject) {
 
         fs.readFile('version.json', 'utf8', function (err, data) {
-            console.log(err);
             if (err) throw err; // we'll not consider error handling for now
             var json = JSON.parse(data);
             metadata['software'].push({
