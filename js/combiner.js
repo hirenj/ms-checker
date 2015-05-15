@@ -153,6 +153,8 @@ var combine_all_peptides = function(peps) {
         var hexnac_type = {};
         var max_score = null;
 
+        var spectra = [];
+
         peps.forEach(function(pep) {
             if ("CalculatedRatio" in pep) {
                 quant = pep.CalculatedRatio;
@@ -173,9 +175,7 @@ var combine_all_peptides = function(peps) {
             if ("possible_mods" in pep) {
                 has_possible_mods = true;
             }
-            if (pep.score && max_score == null || pep.score > max_score) {
-                max_score = pep.score;
-            }
+            spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan } );
         });
         var block = {
             'multi_protein' : false,
@@ -194,21 +194,16 @@ var combine_all_peptides = function(peps) {
             block.sites = first_pep.modifications.map(function(mod) { return [ mod[0], mod[1] ]; } );
         }
 
-        if (max_score !== null) {
-            block.score = max_score;
-        }
-
         if (first_pep.Composition) {
-            block.composition = first_pep.Composition[0];
-            if (first_pep.Composition.length > 1) {
-                debugger;
-            }
+            block.composition = first_pep.Composition;
         } else if (first_pep.modifications) {
             var count = 0;
-            block.composition = [first_pep.modifications.map(function(site) { count += 1; return site[1]; })[0], count ].reverse().join('x');
+            block.composition = peptide.composition(first_pep.modifications);
         }
 
         block.peptide_start = first_pep.pep_start + 1;
+
+        block.spectra = spectra;
 
         if (has_possible_mods) {
             block.ambiguous_mods = peps.map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);

@@ -20,14 +20,14 @@ WHERE (ProcessingNodeParentNumber LIKE ? \
         )';
 
 const retrieve_spectrum_sql = 'SELECT \
-    Spectrum, Charge \
+    Spectrum, Charge, ScanNumbers as scan, RetentionTime as rt \
 FROM SpectrumHeaders \
     LEFT JOIN Spectra USING (UniqueSpectrumID) \
 WHERE SpectrumID = ?';
 
 
 const retrieve_spectrum_from_node_sql = 'SELECT \
-    Spectrum, Charge \
+    Spectrum, Charge, ScanNumbers as scan, RetentionTime as rt \
 FROM SpectrumHeaders \
     LEFT JOIN Spectra USING (UniqueSpectrumID) \
 WHERE SpectrumID = ? AND SpectrumHeaders.CreatingProcessingNodeNumber = ?';
@@ -206,6 +206,8 @@ var get_spectrum = function(db,pep,processing_node) {
         }
         var spectrum = spectra[0].Spectrum;
         var charge = spectra[0].Charge;
+        pep.retentionTime = spectra[0].rt;
+        pep.scan = spectra[0].scan;
         return unzip_spectrum(spectrum).then(parse_spectrum).then(function(spectrum){
             spectrum.spectrumID = pep.SpectrumID;
             spectrum.charge = charge;

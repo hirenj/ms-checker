@@ -2,7 +2,7 @@ var xlsx = require('node-xlsx');
 var fs = require('fs');
 
 var write_excel_file = function(datablock,filename) {
-	var rows = [[ "uniprot", "peptide_id", "quant" , "quant_mad", "hexnac_type", "sequence", "composition", "site", "ambiguous"  ]];
+	var rows = [[ "uniprot", "peptide_id", "quant" , "quant_mad", "hexnac_type", "sequence", "composition", "spectra",  "site", "ambiguous"  ]];
 	var peptide_id = 0;
     Object.keys(datablock).forEach(function(uniprot) {
     	var peps = datablock[uniprot].filter(function(pep) { return ! pep.multi_protein; });
@@ -25,7 +25,9 @@ var write_excel_file = function(datablock,filename) {
     			data.push(null);
     		}
     		data.push(pep.sequence);
-               data.push(pep.composition);
+            data.push(pep.composition.join(';'));
+            data.push(pep.spectra.map(function(spec) {  return spec.score +"-" + spec.rt + "-" + spec.scan;  }).join(","));
+
     		if (pep.sites) {
     			pep.sites.forEach(function(site) {
     				rows.push(data.concat([site[0]]));
