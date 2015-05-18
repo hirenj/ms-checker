@@ -52,6 +52,7 @@ var get_self_version = function(metadata) {
         fs.readFile('version.json', 'utf8', function (err, data) {
             if (err) throw err; // we'll not consider error handling for now
             var json = JSON.parse(data);
+            metadata['software'] = metadata['software'] || [];
             metadata['software'].push({
                 'name' : 'ms-checker',
                 'version' : json.revision[0],

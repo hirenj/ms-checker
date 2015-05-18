@@ -343,7 +343,14 @@ var init_caches = function(db) {
     return produce_peptide_modification_data(db,{}).then(function() { return find_dimethyls(db,{'PeptideID': 0}); });
 };
 
+var clear_caches = function() {
+    validated_quans_cache = {};
+    dimethyl_count_cache = null;
+    peptide_modifications_cache = {'empty' : true };
+};
+
 exports.init_caches = init_caches;
+exports.clear_caches = clear_caches;
 exports.retrieve_quantified_peptides = retrieve_quantified_peptides;
 exports.modifications_cache = peptide_modifications_cache;
 exports.check_quantified_peptides = check_quantified_peptides;
