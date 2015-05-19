@@ -94,7 +94,7 @@ var guess_hexnac = function(db,peps) {
             return peps;
         }
         return Promise.all(  to_cut.splice(0,split_length).map(function(pep) {
-                                return spectra.get_spectrum(db,pep).then( check_galnac_glcnac_ratio.bind(null,pep) );
+                                return spectra.get_spectrum(db,pep,processing_node).then( check_galnac_glcnac_ratio.bind(null,pep) );
                             }) ).then(arguments.callee);
     }).catch(function(err) {
         if (err.message === "No Processing node for HCD") {
