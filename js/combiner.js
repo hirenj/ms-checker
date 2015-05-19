@@ -207,7 +207,7 @@ var combine_all_peptides = function(peps) {
         block.spectra = spectra;
 
         if (has_possible_mods) {
-            block.ambiguous_mods = peps.map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);
+            block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);
         }
         first_pep.uniprot.forEach(function(uniprot) {
             if ( ! data[uniprot] ) {
