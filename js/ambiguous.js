@@ -24,6 +24,10 @@ FROM FileInfos \
             FileInfos.FileName LIKE "%Hex%" \
         OR \
             FileInfos.FileName LIKE "%Man%" \
+        OR \
+            FileInfos.FileName LIKE "%xT.%" \
+        OR \
+            FileInfos.FileName LIKE "%xTn.%" \
         ) \
     AND \
         Peptides.ConfidenceLevel = 3';
@@ -37,6 +41,12 @@ FROM FileInfos \
     WHERE \
         Peptides.ConfidenceLevel = 3';
 
+
+var clean_comp = function(comp) {
+    comp = comp.replace('xTn','xHexNAc');
+    comp = comp.replace('xT','xHexHexNAc');
+    return comp;
+}
 
 var retrieve_ambiguous_peptides = function(db) {
     var self = this;
@@ -62,10 +72,11 @@ var retrieve_ambiguous_peptides = function(db) {
             peps.forEach(function(pep) {
                 var composition = (pep.FileName || "").match(/\d+\x.+(?=\.mgf)/);
                 if ( composition ) {
-                    pep.Composition = composition.map(function(comp) { return comp.toString(); });
+                    pep.Composition = composition.map(function(comp) { return comp.toString(); }).map(clean_comp);
                 }
                 delete pep.FileName;
             });
+            console.log("Total "+peps.length+" ambiguous peptides");
             return peps;
         });
     } );

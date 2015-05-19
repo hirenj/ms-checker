@@ -31,10 +31,10 @@ var check_galnac_glcnac_ratio = function(pep,spectrum) {
     var glcnac_intensity = null;
     var galnac_count = 0;
     var glcnac_count = 0;
-    if (spectrum.activation !== 'HCD') {
+    if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
         return;
     }
-    pep.activation = 'HCD';
+    pep.activation = spectrum.activation;
 
     // Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
     // if it is within 0.4 - 0.6, it is a GalNAc, 2.0 or greater, GlcNAc
@@ -71,13 +71,13 @@ var guess_hexnac = function(db,peps) {
     var processing_node = null;
     var result = spectra.init_spectrum_processing_num(db).then(function(node) {
         processing_node = node;
-        if (self.conf.get('hcd-processing-node')) {
+        if (typeof self.conf.get('hcd-processing-node') !== 'undefined') {
             processing_node = parseInt(self.conf.get('hcd-processing-node'));
         }
-        if ( ! processing_node ) {
+        if ( processing_node !== 0 && ! processing_node ) {
             throw new Error("No Processing node for HCD");
         }
-        console.log("We only want spectra from Processing Node ",processing_node);
+        console.log("We only want spectra from Processing Node ",processing_node ? processing_node : 'Any processing node');
         return true;
     });
     var split_length = 50;

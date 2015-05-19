@@ -192,6 +192,9 @@ var init_spectrum_processing_num = function(db) {
 
 var get_spectrum = function(db,pep,processing_node) {
     var spectrum_promise;
+    if (processing_node === 0) {
+        processing_node = null;
+    }
     if ( ! spectrum_caches[pep.SpectrumID] ) {
         if ( typeof processing_node !== 'undefined' && processing_node !== null ) {
             spectrum_promise = db.all(retrieve_spectrum_from_node_sql, [ pep.SpectrumID, processing_node ]);

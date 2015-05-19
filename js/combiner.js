@@ -2,7 +2,7 @@ var peptide = require('./peptide');
 var uniprot_meta = require('./uniprot');
 
 var not_hcd_filter = function(pep) {
-    return pep.activation !== 'HCD';
+    return (pep.activation !== 'HCD' && pep.activation !== 'CID');
 };
 
 var onlyUnique = function(value, index, self) {
@@ -37,7 +37,7 @@ var combine_all_peptides = function(peps) {
         var mods = peps.filter(not_hcd_filter).map(function(pep) { return peptide.modification_key(pep); }).filter(onlyUnique).filter(function(key) { return key.indexOf('-') >= 0; });
 
         peps.forEach(function(pep) {
-            if (mods.length > 1 || pep.activation == 'HCD') {
+            if (mods.length > 1 || pep.activation == 'HCD' || pep.activation == 'CID') {
                 if ( ! pep.Composition && pep.modifications && pep.modifications.length > 0 ) {
                     // We should be a bit smarter about this, grouping compositions appropriately
                     pep.Composition =  peptide.composition(pep.modifications);
@@ -147,6 +147,7 @@ var combine_all_peptides = function(peps) {
             return;
         }
         var first_pep = peps[0];
+
         var quant = null;
         var high_sn = false;
         var has_possible_mods = false;
@@ -163,7 +164,7 @@ var combine_all_peptides = function(peps) {
             if ("has_low_sn" in pep && ! pep.has_low_sn) {
                 high_sn = true;
             }
-            if ("has_pair" in pep && pep.has_pair === true && pep.activation !== 'HCD') {
+            if ("has_pair" in pep && pep.has_pair === true && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
                 quant = pep.QuanChannelID[0] == 1 ? 'potential_light' : 'potential_medium';
             }
             if ("hexnac_type" in pep) {

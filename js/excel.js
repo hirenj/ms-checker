@@ -14,6 +14,7 @@ var write_excel_file = function(datablock,filename) {
     Object.keys(datablock.data).forEach(function(uniprot) {
         var peps = datablock.data[uniprot].filter(function(pep) { return ! pep.multi_protein; });
         peps.forEach(function(pep) {
+
             var data = [];
             data.push(pep.source || null);
             data.push(uniprot);
@@ -46,6 +47,9 @@ var write_excel_file = function(datablock,filename) {
                 pep.ambiguous_mods.forEach(function(ambig) {
                     rows.push(data.concat([null,ambig]));
                 });
+            }
+            if (! pep.sites && ! pep.ambiguous_mods) {
+                rows.push(data.concat([ null,null ]));
             }
         });
     });

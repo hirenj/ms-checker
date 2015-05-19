@@ -247,7 +247,7 @@ var validate_peptide_coverage = function(db,peptides) {
     console.time('Fragmentation');
     exports.notify_task('Validating fragmentation spectra');
 
-    var wanted_peptides = peptides.filter(function(pep) { return ((pep.activation || "") !== "HCD") && pep.modifications && pep.modifications.length > 0; });
+    var wanted_peptides = peptides.filter(function(pep) { return ((pep.activation || "") !== "HCD") &&   ((pep.activation || "") !== "CID") && pep.modifications && pep.modifications.length > 0; });
 
     return batch_promise(wanted_peptides,50,function(pep,idx) {
         return get_b_ion_coverage(db,pep).then(function(ions) {
