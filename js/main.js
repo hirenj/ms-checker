@@ -83,7 +83,13 @@ var gui = require('nw.gui');
 // Print arguments
 console.log(gui.App.argv);
 
-processor.process(files_to_open).then(function(blocks) { return processor.combine(blocks,nconf.get('source')) }).then(function(combined) {
+var sources = nconf.get('source');
+
+if (sources && ! Array.isArray(sources)) {
+    sources = [ sources ];
+}
+
+processor.process(files_to_open).then(function(blocks) { return processor.combine(blocks,sources) }).then(function(combined) {
     console.log(combined);
     if (nconf.get('output')) {
         fs.writeFile(nconf.get('output')+'.json',JSON.stringify(combined),function() {
