@@ -217,5 +217,11 @@ var get_spectrum = function(db,pep,processing_node) {
     return spectrum_caches[pep.SpectrumID];
 };
 
+var clear_caches = function() {
+    spectrum_caches = {};
+};
+
 exports.init_spectrum_processing_num = init_spectrum_processing_num;
 exports.get_spectrum = get_spectrum;
+exports.clear_caches = clear_caches;
+

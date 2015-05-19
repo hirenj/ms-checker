@@ -82,6 +82,7 @@ var process_data = function(filename) {
             return uniprot_meta.init().then(function() {
                 global_datablock.data = peptide.combine(peps);
                 quantitative.clear_caches();
+                spectra.clear_caches();
                 return global_datablock;
             });
         });
