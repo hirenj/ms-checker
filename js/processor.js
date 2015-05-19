@@ -27,7 +27,7 @@ hexnac_hcd.conf = nconf;
     module.on('task',function(desc) {
         console.log(module.constructor.name,desc);
         this.addListener('progress',function(percentage) {
-            console.log(module.constructor.name,desc, 100*percentage);
+            console.log(module.constructor.name,desc, (100*percentage).toFixed(0));
             if (percentage == 1) {
                 module.removeListener('progress',arguments.callee);
             }
@@ -107,17 +107,17 @@ var process_files = function(files) {
 var combine = function(blocks,sources) {
     var result = { data : {} , metadata : [] };
     blocks.forEach(function(block) {
-        var source = sources.shift();
+        var source = (sources || []).shift();
 
         Object.keys(block.data).forEach(function(prot) {
             if ( ! result.data[prot] ) {
                 result.data[prot] = [];
             }
-
-            block.data[prot].forEach(function(pep) {
-                pep.source = source;
-            });
-
+            if (source) {
+                block.data[prot].forEach(function(pep) {
+                    pep.source = source;
+                });
+            }
             result.data[prot] = result.data[prot].concat(block.data[prot]);
         });
         result.metadata.push(block.metadata);

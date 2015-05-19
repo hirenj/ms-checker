@@ -6,6 +6,8 @@ var processor = require('../js/processor.js');
 
 var excel_writer = require('../js/excel.js');
 
+var fs = require('fs');
+
 nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).overrides( require('optimist')(gui.App.argv).argv );
 
 if (nconf.get('MS_DEBUG') || nconf.get('debug')) {
@@ -81,5 +83,13 @@ var gui = require('nw.gui');
 // Print arguments
 console.log(gui.App.argv);
 
-processor.process(files_to_open).then(function(blocks) { return processor.combine(blocks,['TCL','SEC']); }).then(function(combined) { console.log(combined); }).catch(console.log.bind(console));
+processor.process(files_to_open).then(function(blocks) { return processor.combine(blocks,nconf.get('source')) }).then(function(combined) {
+    console.log(combined);
+    if (nconf.get('output')) {
+        fs.writeFile(nconf.get('output')+'.json',JSON.stringify(combined),function() {
+            console.log("Wrote combined file");
+        });
+        excel_writer.write(combined,nconf.get('output')+'.xls');
+    }
+}).catch(console.log.bind(console));
 
