@@ -45,6 +45,7 @@ FROM FileInfos \
 var clean_comp = function(comp) {
     comp = comp.replace('xTn','xHexNAc');
     comp = comp.replace('xT','xHexHexNAc');
+    comp = comp.replace('xGalNAc','xHexNAc');
     return comp;
 }
 
