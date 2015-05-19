@@ -301,6 +301,12 @@ var check_quantified_peptides = function(db,peps) {
 
 var peptide_modifications_cache = {'empty' : true };
 
+var clean_mod = function(mod) {
+    var new_mod = [].concat(mod);
+    new_mod[1] = new_mod[1].replace(/\d/g,'');
+    return new_mod;
+};
+
 var produce_peptide_modification_data = function(db,pep) {
     return new Promise(function(resolve,reject) {
 
@@ -333,7 +339,7 @@ var produce_peptide_modification_data = function(db,pep) {
                 }
             },reject);
         } else {
-            pep.modifications = (peptide_modifications_cache[pep.PeptideID] || []).filter( function(mod) { return (mod[1] || '').indexOf('Hex') >= 0 } ).map( function(mod) { return mod } );
+            pep.modifications = (peptide_modifications_cache[pep.PeptideID] || []).filter( function(mod) { return (mod[1] || '').indexOf('Hex') >= 0 } ).map( clean_mod );
             resolve();
         }
     });

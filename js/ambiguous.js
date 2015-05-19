@@ -72,6 +72,7 @@ var retrieve_ambiguous_peptides = function(db) {
             peptide_search.cleanup(db);
             peps.forEach(function(pep) {
                 var composition = (pep.FileName || "").match(/\d+\x.+(?=\.mgf)/);
+                composition = [].concat.apply( composition.map(function(comp) { return comp.split('_'); }) );
                 if ( composition ) {
                     pep.Composition = composition.map(function(comp) { return comp.toString(); }).map(clean_comp);
                 }
