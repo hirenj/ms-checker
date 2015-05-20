@@ -57,6 +57,12 @@ var open_db = function(filename) {
     });
 };
 
+var browse_file = function(filename) {
+    return open_db(filename).then(function(db) {
+        promisify_sqlite(db);
+        return db;
+    });
+};
 
 var process_data = function(filename) {
     var global_datablock = {'data' : {}, 'metadata' : {}};
@@ -92,6 +98,7 @@ var process_data = function(filename) {
 var process_files = function(files) {
     var result = Promise.resolve(true);
     var blocks = [];
+    files = [].concat(files);
     return result.then(function() {
         var self_func = arguments.callee;
         var file = files.shift();
@@ -126,5 +133,5 @@ var combine = function(blocks,sources) {
     return result;
 };
 
-module.exports = exports = { process: process_files, combine: combine };
+module.exports = exports = { process: process_files, combine: combine, browse_file: browse_file };
 
