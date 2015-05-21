@@ -10,6 +10,36 @@ var onlyUnique = function(value, index, self) {
 };
 
 
+var clone = function(objectToBeCloned) {
+  // Basis.
+  if (!(objectToBeCloned instanceof Object)) {
+    return objectToBeCloned;
+  }
+
+  var objectClone;
+
+  // Filter out special objects.
+  var Constructor = objectToBeCloned.constructor;
+  switch (Constructor) {
+    // Implement other special objects here.
+    case RegExp:
+      objectClone = new Constructor(objectToBeCloned);
+      break;
+    case Date:
+      objectClone = new Constructor(objectToBeCloned.getTime());
+      break;
+    default:
+      objectClone = new Constructor();
+  }
+
+  // Clone each property.
+  for (var prop in objectToBeCloned) {
+    objectClone[prop] = clone(objectToBeCloned[prop]);
+  }
+
+  return objectClone;
+};
+
 var combine_all_peptides = function(peps) {
     var data = {};
     var peptides_by_spectrum = {};
@@ -209,11 +239,17 @@ var combine_all_peptides = function(peps) {
         if (has_possible_mods) {
             block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);
         }
+        var genes = first_pep.gene || [];
+
         first_pep.uniprot.forEach(function(uniprot) {
             if ( ! data[uniprot] ) {
                 data[uniprot] = [];
             }
-            data[uniprot].push(block);
+            var block_copy = clone(block);
+            if (genes.length) {
+                block_copy.gene = genes.shift();
+            }
+            data[uniprot].push(block_copy);
         });
     });
     return data;

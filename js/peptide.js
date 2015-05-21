@@ -78,10 +78,21 @@ var produce_peptide_data = function(db,pep) {
         if ( ! pep.uniprot ) {
             pep.uniprot = [];
         }
+        if ( ! pep.gene ) {
+            pep.gene = [];
+        }
         pep_datas.forEach(function(pep_data) {
+            if ( ! pep_data.Description ) {
+                return;
+            }
             var uniprot = pep_data.Description.split('|')[1];
             if (uniprot && pep.uniprot.indexOf(uniprot) < 0) {
                 pep.uniprot.push(uniprot);
+            }
+            var genes;
+            var re = /(?:GN=)([^\s]+)/g;
+            while( genes = re.exec(pep_data.Description) ) {
+                pep.gene.push(genes[1]);
             }
             if ( ! pep.pep_start ) {
                 pep.pep_start = pep_data.Sequence.indexOf(pep.Sequence);

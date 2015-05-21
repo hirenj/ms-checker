@@ -2,7 +2,7 @@ var xlsx = require('node-xlsx');
 var fs = require('fs');
 
 var write_excel_file = function(datablock,filename) {
-    var rows = [[ "source", "uniprot", "peptide_id", "quant" , "quant_mad", "hexnac_type", "sequence", "composition", "spectra",  "site", "ambiguous"  ]];
+    var rows = [[ "source", "uniprot", "gene", "peptide_id", "quant" , "quant_mad", "hexnac_type", "sequence", "composition", "spectra",  "site", "ambiguous"  ]];
     var metadata = [];
     var peptide_id = 0;
     if (! Array.isArray(datablock.metadata) && datablock.metadata ) {
@@ -18,6 +18,8 @@ var write_excel_file = function(datablock,filename) {
             var data = [];
             data.push(pep.source || null);
             data.push(uniprot);
+
+            data.push(pep.gene);
 
             peptide_id += 1;
             data.push(peptide_id);
