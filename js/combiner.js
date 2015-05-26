@@ -241,11 +241,14 @@ var combine_all_peptides = function(peps) {
         }
         var genes = first_pep.gene || [];
 
-        first_pep.uniprot.forEach(function(uniprot) {
+        first_pep.uniprot.forEach(function(uniprot,idx) {
             if ( ! data[uniprot] ) {
                 data[uniprot] = [];
             }
             var block_copy = clone(block);
+            if (first_pep.starts && first_pep.pep_start != first_pep.starts[idx]) {
+                rescale_ids(first_pep.pep_start,first_pep.starts[idx],block_copy);
+            }
             if (genes.length) {
                 block_copy.gene = genes.shift();
             }
@@ -254,6 +257,32 @@ var combine_all_peptides = function(peps) {
     });
     return data;
 };
+
+var rescale_ids = function(old,new_pos,peptide) {
+    if (old == new_pos) {
+        return;
+    }
+    var ambiguous = peptide.ambiguous_mods;
+    if (ambiguous) {
+        ambiguous = ambiguous.map(function(ambig_pep) {
+            return ambig_pep.split(',').map(function(ambig) {
+                var bits = ambig.split('(');
+                var positions = bits[0].split('-');
+                var mapped = positions.map(function(pos) {
+                    return parseInt(pos) - old + new_pos;
+                });
+                return mapped.join('-')+"("+bits[1];
+            }).join(',');
+        });
+        peptide.ambiguous_mods = ambiguous;
+    }
+    if (peptide.sites) {
+        peptide.sites.forEach(function(comp) {
+            comp[0] = parseInt(comp[0]) - old + new_pos;
+        });
+    }
+    peptide.peptide_start = new_pos;
+}
 
 
 var write_possible_mods = function(mods) {

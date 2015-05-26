@@ -81,6 +81,7 @@ var produce_peptide_data = function(db,pep) {
         if ( ! pep.gene ) {
             pep.gene = [];
         }
+        var starts = [];
         pep_datas.forEach(function(pep_data) {
             if ( ! pep_data.Description ) {
                 return;
@@ -94,10 +95,15 @@ var produce_peptide_data = function(db,pep) {
             while( genes = re.exec(pep_data.Description) ) {
                 pep.gene.push(genes[1]);
             }
+            starts.push(pep_data.Sequence.indexOf(pep.Sequence));
+
             if ( ! pep.pep_start ) {
                 pep.pep_start = pep_data.Sequence.indexOf(pep.Sequence);
             }
         });
+        if (starts.length > 1) {
+            pep.starts = starts;
+        }
     });
 };
 
