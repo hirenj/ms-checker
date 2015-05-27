@@ -94,7 +94,7 @@ var browse_file = function(filename) {
     });
 };
 
-var process_data = function(filename) {
+var process_data = function(filename,sibling_files) {
     var global_datablock = {'data' : {}, 'metadata' : {}};
     return open_db(filename).then(function(db) {
         promisify_sqlite(db);
@@ -111,7 +111,7 @@ var process_data = function(filename) {
             return merged;
         }).then(peptide.filter_ambiguous_spectra)
           .then(peptide.produce_peptide_scores_and_cleanup.bind(peptide,db))
-          .then(hexnac_hcd.guess_hexnac.bind(hexnac_hcd,db))
+          .then(hexnac_hcd.guess_hexnac.bind(hexnac_hcd,db,sibling_files))
           .then(partial(fragmentation.validate_peptide_coverage,db));
 
         return processing_promise.then(function(peps) {
@@ -125,17 +125,29 @@ var process_data = function(filename) {
     });
 };
 
-var process_files = function(files) {
+
+var files_by_source = {};
+
+var process_files = function(files,sources) {
     var result = Promise.resolve(true);
     var blocks = [];
     files = [].concat(files);
+    sources = [].concat(sources);
+    files.forEach(function(file,idx) {
+        var source = sources[idx];
+        files_by_source[source] = (files_by_source[source] || []).concat(file);
+    });
     return result.then(function() {
         var self_func = arguments.callee;
         var file = files.shift();
+        var source = sources.shift();
         if (! file) {
             return blocks;
         }
-        return process_data(file).then(function(block) {
+        var other_files = files_by_source[source].filter(function(other_file) {
+            return other_file !== file;
+        });
+        return process_data(file,other_files).then(function(block) {
             blocks.push(block);
             return self_func();
         });

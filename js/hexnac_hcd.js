@@ -1,10 +1,30 @@
 var util = require('util');
 var spectra = require('./spectrum');
+var promisify_sqlite = require('./sqlite-promise');
 
 var HexNAcHCD = function HexNAcHCD() {
 };
 
 util.inherits(HexNAcHCD,require('./processing-step.js'));
+
+var open_db = function(filename) {
+    return new Promise(function(resolve,reject) {
+        var db = new sqlite3.Database(filename,sqlite3.OPEN_READONLY,function(err) {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(db);
+        });
+    });
+};
+
+var get_db = function(filename) {
+    return open_db(filename).then(function(db) {
+        promisify_sqlite(db);
+        return db;
+    });
+};
 
 module.exports = exports = new HexNAcHCD();
 
@@ -56,18 +76,51 @@ var accept_mass = function(masses,intensities,mass,intensity) {
     }
 };
 
+var find_partner_hcd = function(spectrum,db) {
+    var self = this;
+    // Get spectrum parent ion
+    // Get spectrum retention time
+    // Get spectrum scan number
+
+    if (typeof db === 'string') {
+        return get_db(db).then(find_partner_hcd.bind(self,spectrum));
+    }
+};
+
+var search_partner_hcd_in_msfs = function(spectrum,db) {
+    // Search in db for another spectrum that matches this
+    Promise.all(
+        [db].concat(self.sibling_msfs)
+        .map(find_partner_hcd.bind(self,spectrum))
+    ).then(function(partners) {
+        return partners.filter(function(spec) { return spec; });
+    });
+};
+
+var decide_spectrum = function(db,pep,spectrum) {
+    var self = this;
+    if (! spectrum ) {
+        return;
+    }
+    if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
+        return self.search_partner_hcd_in_msfs(spectrum,db)
+               .then(check_galnac_glcnac_ratio.bind(pep));
+    }
+    return check_galnac_glcnac_ratio(pep,spectrum);
+};
 
 var check_galnac_glcnac_ratio = function(pep,spectrum) {
     if (! spectrum ) {
+        return;
+    }
+
+    if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
         return;
     }
     var galnac_intensities = [];
     var glcnac_intensities = [];
     var galnac_masses = [];
     var glcnac_masses = [];
-    if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
-        return;
-    }
 
     var error = this.error || {'ppm' : 15};
 
@@ -104,30 +157,17 @@ var check_galnac_glcnac_ratio = function(pep,spectrum) {
     return;
 };
 
-var guess_hexnac = function(db,peps) {
+var guess_hexnac = function(db,sibling_msfs,peps) {
     var self = this;
     var to_cut = [].concat(peps);
-    var processing_node = null;
-    var result = spectra.init_spectrum_processing_num(db).then(function(node) {
-        processing_node = node;
-        if (typeof self.conf.get('hcd-processing-node') !== 'undefined') {
-            processing_node = parseInt(self.conf.get('hcd-processing-node'));
-        }
-
-        if ( ! processing_node ) {
-            processing_node = 0;
-        }
-
-        if ( processing_node !== 0 && ! processing_node ) {
-            throw new Error("No Processing node for HCD");
-        }
-        console.log("We only want spectra from Processing Node ",processing_node ? processing_node : 'Any processing node');
-        return true;
-    });
     var split_length = 50;
 
     self.notify_task('Processing HexNAc HCD spectra');
     self.notify_progress(0,1);
+
+    // We should only be procesing one set of peptides
+    // at a time (i.e. one MSF file)
+    self.sibling_msfs = sibling_msfs;
 
     var total = peps.length;
     result = result.then(function() {
@@ -137,9 +177,11 @@ var guess_hexnac = function(db,peps) {
         if (to_cut.length < 1) {
             return peps;
         }
-        return Promise.all(  to_cut.splice(0,split_length).map(function(pep) {
-                                return spectra.get_spectrum(db,pep,processing_node).then( check_galnac_glcnac_ratio.bind(self,pep) );
-                            }) ).then(arguments.callee);
+        return Promise.all( 
+            to_cut.splice(0,split_length).map(function(pep) {
+                return spectra.get_spectrum(db,pep).
+                       then( decide_spectrum.bind(self,db,pep) );
+            }) ).then(arguments.callee);
     }).catch(function(err) {
         if (err.message === "No Processing node for HCD") {
             self.notify_progress(1,1);
