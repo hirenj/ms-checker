@@ -238,6 +238,7 @@ var combine_all_peptides = function(peps) {
 
         if (has_possible_mods) {
             block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);
+            block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).length > 0;
         }
         var genes = first_pep.gene || [];
 

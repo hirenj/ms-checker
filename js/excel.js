@@ -2,7 +2,7 @@ var xlsx = require('node-xlsx');
 var fs = require('fs');
 
 var write_excel_file = function(datablock,filename) {
-    var rows = [[ "source", "uniprot", "gene","multiple", "peptide_id", "quant" , "quant_mad", "hexnac_type", "sequence", "composition", "spectra",  "site", "ambiguous"  ]];
+    var rows = [[ "source", "uniprot", "gene","multiple_proteins", "peptide_id", "quant" , "quant_mad", "hexnac_type", "sequence", "peptide_start", "composition", "spectra", "fragments_ambig" , "site", "ambiguous"  ]];
     var metadata = [];
     var peptide_id = 0;
     if (! Array.isArray(datablock.metadata) && datablock.metadata ) {
@@ -38,9 +38,10 @@ var write_excel_file = function(datablock,filename) {
                 data.push(null);
             }
             data.push(pep.sequence);
+            data.push(pep.peptide_start);
             data.push(pep.composition.join(';'));
             data.push(pep.spectra.map(function(spec) {  return spec.score +"-" + spec.rt + "-" + spec.scan;  }).join(","));
-
+            data.push(pep.made_ambiguous || false);
             if (pep.sites) {
                 pep.sites.forEach(function(site) {
                     rows.push(data.concat([site[0]]));

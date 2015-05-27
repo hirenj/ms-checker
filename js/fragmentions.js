@@ -219,6 +219,7 @@ var resolve_modifications = function(pep,aa_re) {
         }
         pep.possible_mods = pep.modifications;
         delete pep.modifications;
+        pep.made_ambiguous = true;
     }
     return pep;
 };

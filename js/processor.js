@@ -45,6 +45,36 @@ var onlyUnique = function(value, index, self) {
     return self.indexOf(value) === index;
 };
 
+var clone = function(objectToBeCloned) {
+  // Basis.
+  if (!(objectToBeCloned instanceof Object)) {
+    return objectToBeCloned;
+  }
+
+  var objectClone;
+
+  // Filter out special objects.
+  var Constructor = objectToBeCloned.constructor;
+  switch (Constructor) {
+    // Implement other special objects here.
+    case RegExp:
+      objectClone = new Constructor(objectToBeCloned);
+      break;
+    case Date:
+      objectClone = new Constructor(objectToBeCloned.getTime());
+      break;
+    default:
+      objectClone = new Constructor();
+  }
+
+  // Clone each property.
+  for (var prop in objectToBeCloned) {
+    objectClone[prop] = clone(objectToBeCloned[prop]);
+  }
+
+  return objectClone;
+};
+
 var open_db = function(filename) {
     return new Promise(function(resolve,reject) {
         var db = new sqlite3.Database(filename,sqlite3.OPEN_READONLY,function(err) {
@@ -122,7 +152,15 @@ var combine = function(blocks,sources) {
                 result.data[prot] = [];
             }
             if (source) {
+                block.data[prot] = block.data[prot].map(function(pep) {
+                    return clone(pep);
+                });
                 block.data[prot].forEach(function(pep) {
+                    // We should really filter out fields so that
+                    // we only accept the ones we want
+
+                    delete pep.made_ambiguous;
+
                     pep.source = source;
                 });
             }
