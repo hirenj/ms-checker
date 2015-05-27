@@ -41,7 +41,7 @@ var write_excel_file = function(datablock,filename) {
             data.push(pep.peptide_start);
             data.push(pep.composition.join(';'));
             data.push(pep.spectra.map(function(spec) {  return spec.score +"-" + spec.rt + "-" + spec.scan;  }).join(","));
-            data.push(pep.made_ambiguous || false);
+            data.push(pep.made_ambiguous || '');
             if (pep.sites) {
                 pep.sites.forEach(function(site) {
                     rows.push(data.concat([site[0]]));

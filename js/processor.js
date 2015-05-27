@@ -156,11 +156,6 @@ var combine = function(blocks,sources) {
                     return clone(pep);
                 });
                 block.data[prot].forEach(function(pep) {
-                    // We should really filter out fields so that
-                    // we only accept the ones we want
-
-                    delete pep.made_ambiguous;
-
                     pep.source = source;
                 });
             }

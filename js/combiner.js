@@ -40,6 +40,28 @@ var clone = function(objectToBeCloned) {
   return objectClone;
 };
 
+var check_single_site = function(pep) {
+    var indices = [];
+    var str = pep.Sequence;
+    for(var i=0; i<str.length;i++) {
+        if (str[i] === "S" || str[i] == "T" || str[i] == "Y") indices.push(i+1);
+    }
+    if (pep.modifications || ! pep.Composition) {
+        if ( ! pep.Composition && ! pep.modifications) {
+            debugger;
+        }
+        return;
+    }
+    if (pep.Composition.length > 1) {
+        return;
+    }
+    var total_sites = pep.Composition.map(function(comp) {  return parseInt(comp.split('x')[0]); }).reduce(function(old,n) { return old + n; },0);
+    if (indices.length == total_sites && ! pep.modifications) {
+        pep.modifications = indices.map(function(idx) {  return [ idx, pep.Composition[0].slice(2) ] ; });
+        pep.made_ambiguous = 'inferred';
+    }
+}
+
 var combine_all_peptides = function(peps) {
     var data = {};
     var peptides_by_spectrum = {};
@@ -92,6 +114,9 @@ var combine_all_peptides = function(peps) {
 
     var grouped_peptides = {};
     peps.forEach(function(pep) {
+
+        check_single_site(pep);
+
         var pep_key = pep.Sequence+"-"+peptide.modification_key(pep);
         if ( ! grouped_peptides[pep_key] ) {
             grouped_peptides[pep_key] = [];
@@ -238,7 +263,12 @@ var combine_all_peptides = function(peps) {
 
         if (has_possible_mods) {
             block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);
-            block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).length > 0;
+            block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).length > 0 ? 'fragmentation' : '';
+        } else {
+            block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).map(function(pep) { return pep.made_ambiguous; }).filter(onlyUnique)[0];
+            if (! block.made_ambiguous) {
+                delete block.made_ambiguous;
+            }
         }
         var genes = first_pep.gene || [];
 

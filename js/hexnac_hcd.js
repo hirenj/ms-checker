@@ -113,6 +113,11 @@ var guess_hexnac = function(db,peps) {
         if (typeof self.conf.get('hcd-processing-node') !== 'undefined') {
             processing_node = parseInt(self.conf.get('hcd-processing-node'));
         }
+
+        if ( ! processing_node ) {
+            processing_node = 0;
+        }
+
         if ( processing_node !== 0 && ! processing_node ) {
             throw new Error("No Processing node for HCD");
         }
