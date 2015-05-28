@@ -11,7 +11,9 @@ util.inherits(HexNAcHCD,require('./processing-step.js'));
 
 var open_db = function(filename) {
     return new Promise(function(resolve,reject) {
-        var db = new sqlite3.Database(filename,sqlite3.OPEN_READONLY,function(err) {
+        var db = new sqlite3.Database(filename,sqlite3.OPEN_READWRITE,function(err) {
+            db.run('CREATE index if not exists ms_check_spectrum_peak_id on SpectrumHeaders(MassPeakID)');
+            db.run('CREATE index if not exists ms_check_spec_data on SpectrumHeaders(RetentionTime,Charge,Mass)');
             if (err) {
                 reject(err);
                 return;
@@ -21,12 +23,18 @@ var open_db = function(filename) {
     });
 };
 
+var cached_db_promises = {};
+
 var get_db = function(filename) {
-    return open_db(filename).then(function(db) {
+    if (cached_db_promises[filename]) {
+        return cached_db_promises[filename];
+    }
+    cached_db_promises[filename] = open_db(filename).then(function(db) {
         promisify_sqlite(db);
-        db.partner = true;
+        db.partner = filename;
         return db;
     });
+    return cached_db_promises[filename];
 };
 
 module.exports = exports = new HexNAcHCD();

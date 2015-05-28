@@ -42,16 +42,12 @@ WHERE MassPeakID IN ( \
         WHERE SpectrumID = ? \
 )';
 
-const retrieve_related_spectra_by_data_sql = 'SELECT SpectrumID \
+const retrieve_related_spectra_by_data_sql = 'SELECT SpectrumID,ScanNumbers \
 FROM SpectrumHeaders \
 WHERE \
-    (ScanNumbers = ? OR ScanNumbers = ? OR ScanNumbers = ?) \
-AND \
-    RetentionTime < ? AND RetentionTime > ? - 0.03 \
-AND \
-    Charge = ? \
-AND \
-    Mass < ? + 0.01 AND Mass > ? - 0.01';
+    RetentionTime BETWEEN ? AND ? \
+    AND Charge = ? \
+    AND Mass BETWEEN ? AND ?';
 
 var spectrum_caches = {};
 
@@ -215,16 +211,17 @@ var get_spectrum = function(db,pep,processing_node,no_cache) {
     if (processing_node === 0) {
         processing_node = null;
     }
-    if ( ! spectrum_caches[pep.SpectrumID] || no_cache ) {
+    var cache_id = pep.SpectrumID;
+    if (no_cache) {
+        cache_id = no_cache+pep.SpectrumID;//Math.random().toString(36).substring(10);
+    }
+
+    if ( ! spectrum_caches[cache_id] ) {
         if ( typeof processing_node !== 'undefined' && processing_node !== null ) {
             spectrum_promise = db.all(retrieve_spectrum_from_node_sql, [ pep.SpectrumID, processing_node ]);
         } else {
             spectrum_promise = db.all(retrieve_spectrum_sql, [ pep.SpectrumID ]);
         }
-    }
-    var cache_id = pep.SpectrumID;
-    if (no_cache) {
-        cache_id = Math.random().toString(36).substring(10);
     }
     spectrum_caches[cache_id] = spectrum_caches[cache_id] || spectrum_promise.then(function(spectra) {
         if (spectra.length == 0) {
@@ -246,7 +243,11 @@ var get_spectrum = function(db,pep,processing_node,no_cache) {
             return spectrum;
         });
     });
-    return spectrum_caches[cache_id];
+    var result = spectrum_caches[cache_id];
+    // if (no_cache) {
+    //     delete spectrum_caches[cache_id];
+    // }
+    return result;
 };
 
 var get_related_spectra = function(db,spectrum) {
@@ -261,9 +262,11 @@ var get_related_spectra = function(db,spectrum) {
 };
 
 var match_spectrum_data = function(db, scan, rt, charge, mass) {
-    return db.all(retrieve_related_spectra_by_data_sql,[parseInt(scan) - 1,parseInt(scan) -2 ,parseInt(scan) - 3,rt,rt,charge,mass,mass]).then(function(spec_ids) {
+    var wanted_scan = parseInt(scan);
+    return db.do_statement(retrieve_related_spectra_by_data_sql,[rt - 0.03,rt + 0.03,charge,mass-0.01,mass+0.01]).then(function(spec_ids) {
+        var wanted_spec_ids = (spec_ids || []).filter(function(spec) {  return Math.abs(wanted_scan - parseInt(spec.ScanNumbers)) <= 3;  });
         return Promise.all((spec_ids || []).map(function(spec_id) {
-            return get_spectrum(db,spec_id,null,true);
+            return get_spectrum(db,spec_id,null,db.partner);
         }));
     });
 };

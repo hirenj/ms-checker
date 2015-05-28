@@ -145,7 +145,8 @@ var clone = function(objectToBeCloned) {
 
 var open_db = function(filename) {
     return new Promise(function(resolve,reject) {
-        var db = new sqlite3.Database(filename,sqlite3.OPEN_READONLY,function(err) {
+        var db = new sqlite3.Database(filename,sqlite3.OPEN_READWRITE,function(err) {
+            db.run('CREATE index if not exists ms_check_spectrum_peak_id on SpectrumHeaders(MassPeakID)');
             if (err) {
                 reject(err);
                 return;
