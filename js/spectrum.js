@@ -33,6 +33,15 @@ FROM SpectrumHeaders \
 WHERE SpectrumID = ? AND SpectrumHeaders.CreatingProcessingNodeNumber = ?';
 
 
+const retrieve_related_spectra_sql = 'SELECT SpectrumID \
+FROM SpectrumHeaders \
+WHERE MassPeakID IN ( \
+    SELECT \
+        DISTINCT SpectrumHeaders.MassPeakID \
+        FROM SpectrumHeaders \
+        WHERE SpectrumID = ? \
+)';
+
 var spectrum_caches = {};
 
 var unzip_spectrum = function(spectrum_text) {
@@ -220,11 +229,23 @@ var get_spectrum = function(db,pep,processing_node) {
     return spectrum_caches[pep.SpectrumID];
 };
 
+var get_related_spectra = function(db,spectrum) {
+    if ( ! spectrum.spectrumID ) {
+        return [];
+    }
+    return db.all(retrieve_related_spectra_sql,[spectrum.spectrumID]).then(function(spec_ids) {
+        return Promise.all((spec_ids || []).map(function(spec_id) {
+            return get_spectrum(db,spec_id);
+        }));
+    });
+};
+
 var clear_caches = function() {
     spectrum_caches = {};
 };
 
 exports.init_spectrum_processing_num = init_spectrum_processing_num;
 exports.get_spectrum = get_spectrum;
+exports.get_related_spectra = get_related_spectra;
 exports.clear_caches = clear_caches;
 

@@ -22,6 +22,7 @@ var open_db = function(filename) {
 var get_db = function(filename) {
     return open_db(filename).then(function(db) {
         promisify_sqlite(db);
+        db.partner = true;
         return db;
     });
 };
@@ -81,19 +82,25 @@ var find_partner_hcd = function(spectrum,db) {
     // Get spectrum parent ion
     // Get spectrum retention time
     // Get spectrum scan number
-
     if (typeof db === 'string') {
         return get_db(db).then(find_partner_hcd.bind(self,spectrum));
+    }
+    if ( ! db.partner ) {
+        return spectra.get_related_spectra(db,spectrum);
     }
 };
 
 var search_partner_hcd_in_msfs = function(spectrum,db) {
+    var self = this;
     // Search in db for another spectrum that matches this
-    Promise.all(
+    return Promise.all(
         [db].concat(self.sibling_msfs)
-        .map(find_partner_hcd.bind(self,spectrum))
+        .map(function(db) {
+            return find_partner_hcd.bind(self,spectrum)(db);
+        })
     ).then(function(partners) {
-        return partners.filter(function(spec) { return spec; });
+        partners = Array.prototype.concat.apply([], partners).filter(function(spec) { return spec; });
+        return partners;
     });
 };
 
@@ -103,17 +110,22 @@ var decide_spectrum = function(db,pep,spectrum) {
         return;
     }
     if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
-        return self.search_partner_hcd_in_msfs(spectrum,db)
-               .then(check_galnac_glcnac_ratio.bind(pep));
+        return search_partner_hcd_in_msfs.bind(self)(spectrum,db)
+               .then(check_galnac_glcnac_ratio.bind(null,pep));
     }
     return check_galnac_glcnac_ratio(pep,spectrum);
 };
 
-var check_galnac_glcnac_ratio = function(pep,spectrum) {
+var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
     if (! spectrum ) {
         return;
     }
-
+    if (Array.isArray(spectrum)) {
+        spectrum.forEach(function(spec) {
+            check_galnac_glcnac_ratio(pep,spec,true);
+        });
+        return;
+    }
     if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
         return;
     }
@@ -123,8 +135,9 @@ var check_galnac_glcnac_ratio = function(pep,spectrum) {
     var glcnac_masses = [];
 
     var error = this.error || {'ppm' : 15};
-
-    pep.activation = spectrum.activation;
+    if ( ! partner ) {
+        pep.activation = spectrum.activation;
+    }
 
     // Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
     // if it is within 0.4 - 0.6, it is a GalNAc, 2.0 or greater, GlcNAc
@@ -149,10 +162,15 @@ var check_galnac_glcnac_ratio = function(pep,spectrum) {
         // console.log("Do not have 4 peaks to get the intensity for ",pep.SpectrumID,galnac_masses,glcnac_masses);
     }
     if (galnac_count == 2 && glcnac_count == 2) {
-        pep.galnac_intensity = galnac_intensity;
-        pep.glcnac_intensity = glcnac_intensity;
         var ratio = galnac_intensity / glcnac_intensity;
-        pep.hexnac_type = (ratio <= 0.95) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'Unknown' );
+        var hexnac_type = (ratio <= 0.95) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'Unknown' );
+        if (! pep.hexnac_type || pep.hexnac_type == 'Unknown') {
+            pep.galnac_intensity = galnac_intensity;
+            pep.glcnac_intensity = glcnac_intensity;
+            pep.hexnac_type = hexnac_type;
+        } else if (pep.hexnac_type && pep.hexnac_type != hexnac_type ) {
+            console.log("Conflicting HexNAc types ", pep.hexnac_type,hexnac_type);
+        }
     }
     return;
 };
@@ -161,7 +179,6 @@ var guess_hexnac = function(db,sibling_msfs,peps) {
     var self = this;
     var to_cut = [].concat(peps);
     var split_length = 50;
-
     self.notify_task('Processing HexNAc HCD spectra');
     self.notify_progress(0,1);
 
@@ -170,7 +187,7 @@ var guess_hexnac = function(db,sibling_msfs,peps) {
     self.sibling_msfs = sibling_msfs;
 
     var total = peps.length;
-    result = result.then(function() {
+    result = Promise.resolve().then(function() {
 
         self.notify_progress(total-to_cut.length,total);
 
