@@ -1,10 +1,33 @@
-var util = require('util');
+var util = require('util'),
+    sqlite3 = require('sqlite3');
 var spectra = require('./spectrum');
+var peptide = require('./peptide');
+var promisify_sqlite = require('./sqlite-promise');
 
 var HexNAcHCD = function HexNAcHCD() {
 };
 
 util.inherits(HexNAcHCD,require('./processing-step.js'));
+
+var open_db = function(filename) {
+    return new Promise(function(resolve,reject) {
+        var db = new sqlite3.Database(filename,sqlite3.OPEN_READONLY,function(err) {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(db);
+        });
+    });
+};
+
+var get_db = function(filename) {
+    return open_db(filename).then(function(db) {
+        promisify_sqlite(db);
+        db.partner = true;
+        return db;
+    });
+};
 
 module.exports = exports = new HexNAcHCD();
 
@@ -56,22 +79,90 @@ var accept_mass = function(masses,intensities,mass,intensity) {
     }
 };
 
+var find_partner_hcd = function(spectrum,glyco_mass,db) {
+    var self = this;
 
-var check_galnac_glcnac_ratio = function(pep,spectrum) {
+    if (typeof db === 'string') {
+        return get_db(db).then(find_partner_hcd.bind(self,spectrum,glyco_mass));
+    }
+
+    if ( ! db.partner ) {
+        return spectra.get_related_spectra(db,spectrum);
+    }
+
+    return spectra.match_spectrum_data(db, spectrum.scan, spectrum.rt, spectrum.charge, spectrum.mass - glyco_mass).then(function(spectra) {
+        return spectra;
+    });
+};
+
+var search_partner_hcd_in_msfs = function(spectrum,db,glyco_mass) {
+    var self = this;
+    // Search in db for another spectrum that matches this
+
+    return Promise.all(
+        [db].concat(self.sibling_msfs)
+        .map(find_partner_hcd.bind(self,spectrum,glyco_mass))
+    ).then(function(partners) {
+        partners = Array.prototype.concat.apply([], partners).filter(function(spec) { return spec; });
+        return partners;
+    }).catch(function(err) {
+        console.error(err);
+    });
+};
+
+const mod_masses = {
+    'HexNAc' : 203.079373,
+    'HexHexNAc' : 365.132196,
+    'Hex1HexNAc1' : 365.132196
+};
+
+var calculate_glyco_composition = function(composition,mods) {
+    return composition.map(function(comp) {
+        var bits = comp.split('x');
+        var count = parseInt(bits.shift());
+        var mass = mod_masses[bits.join('x')];
+        if ( ! mass ) {
+            console.log("Missing mass for ",bits.join('x'));
+        }
+        return count * mass;
+    }).reduce(function(curr,next) { return curr+next; },0);
+}
+
+var decide_spectrum = function(db,pep,spectrum) {
+    var self = this;
     if (! spectrum ) {
+        return;
+    }
+    if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
+        var glyco_mass = calculate_glyco_composition(pep.Composition || peptide.composition(pep.modifications));
+        return search_partner_hcd_in_msfs.bind(self)(spectrum,db,glyco_mass)
+               .then(check_galnac_glcnac_ratio.bind(null,pep));
+    }
+    return check_galnac_glcnac_ratio(pep,spectrum);
+};
+
+var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
+    if (! spectrum ) {
+        return;
+    }
+    if (Array.isArray(spectrum)) {
+        spectrum.forEach(function(spec) {
+            check_galnac_glcnac_ratio(pep,spec,true);
+        });
+        return;
+    }
+    if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
         return;
     }
     var galnac_intensities = [];
     var glcnac_intensities = [];
     var galnac_masses = [];
     var glcnac_masses = [];
-    if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
-        return;
-    }
 
     var error = this.error || {'ppm' : 15};
-
-    pep.activation = spectrum.activation;
+    if ( ! partner ) {
+        pep.activation = spectrum.activation;
+    }
 
     // Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
     // if it is within 0.4 - 0.6, it is a GalNAc, 2.0 or greater, GlcNAc
@@ -96,50 +187,43 @@ var check_galnac_glcnac_ratio = function(pep,spectrum) {
         // console.log("Do not have 4 peaks to get the intensity for ",pep.SpectrumID,galnac_masses,glcnac_masses);
     }
     if (galnac_count == 2 && glcnac_count == 2) {
-        pep.galnac_intensity = galnac_intensity;
-        pep.glcnac_intensity = glcnac_intensity;
         var ratio = galnac_intensity / glcnac_intensity;
-        pep.hexnac_type = (ratio <= 0.95) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'Unknown' );
+        var hexnac_type = (ratio <= 0.95) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'Unknown' );
+        if (! pep.hexnac_type || pep.hexnac_type == 'Unknown') {
+            pep.galnac_intensity = galnac_intensity;
+            pep.glcnac_intensity = glcnac_intensity;
+            pep.hexnac_type = hexnac_type;
+        } else if (pep.hexnac_type && pep.hexnac_type != hexnac_type ) {
+            console.log("Conflicting HexNAc types ", pep.hexnac_type,hexnac_type);
+        }
     }
     return;
 };
 
-var guess_hexnac = function(db,peps) {
+var guess_hexnac = function(db,sibling_msfs,peps) {
     var self = this;
     var to_cut = [].concat(peps);
-    var processing_node = null;
-    var result = spectra.init_spectrum_processing_num(db).then(function(node) {
-        processing_node = node;
-        if (typeof self.conf.get('hcd-processing-node') !== 'undefined') {
-            processing_node = parseInt(self.conf.get('hcd-processing-node'));
-        }
-
-        if ( ! processing_node ) {
-            processing_node = 0;
-        }
-
-        if ( processing_node !== 0 && ! processing_node ) {
-            throw new Error("No Processing node for HCD");
-        }
-        console.log("We only want spectra from Processing Node ",processing_node ? processing_node : 'Any processing node');
-        return true;
-    });
     var split_length = 50;
-
     self.notify_task('Processing HexNAc HCD spectra');
     self.notify_progress(0,1);
 
+    // We should only be procesing one set of peptides
+    // at a time (i.e. one MSF file)
+    self.sibling_msfs = sibling_msfs;
+
     var total = peps.length;
-    result = result.then(function() {
+    result = Promise.resolve().then(function() {
 
         self.notify_progress(total-to_cut.length,total);
 
         if (to_cut.length < 1) {
             return peps;
         }
-        return Promise.all(  to_cut.splice(0,split_length).map(function(pep) {
-                                return spectra.get_spectrum(db,pep,processing_node).then( check_galnac_glcnac_ratio.bind(self,pep) );
-                            }) ).then(arguments.callee);
+        return Promise.all( 
+            to_cut.splice(0,split_length).map(function(pep) {
+                return spectra.get_spectrum(db,pep).
+                       then( decide_spectrum.bind(self,db,pep) );
+            }) ).then(arguments.callee);
     }).catch(function(err) {
         if (err.message === "No Processing node for HCD") {
             self.notify_progress(1,1);

@@ -11,6 +11,7 @@
     "nconf": "^0.7.1",
     "node-xlsx": "^0.5.1",
     "optimist": "^0.6.1",
+    "progress": "^1.1.8",
     "sax": "^0.6.1",
     "saxpath": "^0.6.1",
     "sqlite3": "^3.0.5",
