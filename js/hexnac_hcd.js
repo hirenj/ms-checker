@@ -1,5 +1,7 @@
-var util = require('util');
+var util = require('util'),
+    sqlite3 = require('sqlite3');
 var spectra = require('./spectrum');
+var peptide = require('./peptide');
 var promisify_sqlite = require('./sqlite-promise');
 
 var HexNAcHCD = function HexNAcHCD() {
@@ -77,32 +79,54 @@ var accept_mass = function(masses,intensities,mass,intensity) {
     }
 };
 
-var find_partner_hcd = function(spectrum,db) {
+var find_partner_hcd = function(spectrum,glyco_mass,db) {
     var self = this;
-    // Get spectrum parent ion
-    // Get spectrum retention time
-    // Get spectrum scan number
+
     if (typeof db === 'string') {
-        return get_db(db).then(find_partner_hcd.bind(self,spectrum));
+        return get_db(db).then(find_partner_hcd.bind(self,spectrum,glyco_mass));
     }
+
     if ( ! db.partner ) {
         return spectra.get_related_spectra(db,spectrum);
     }
+
+    return spectra.match_spectrum_data(db, spectrum.scan, spectrum.rt, spectrum.charge, spectrum.mass - glyco_mass).then(function(spectra) {
+        return spectra;
+    });
 };
 
-var search_partner_hcd_in_msfs = function(spectrum,db) {
+var search_partner_hcd_in_msfs = function(spectrum,db,glyco_mass) {
     var self = this;
     // Search in db for another spectrum that matches this
+
     return Promise.all(
         [db].concat(self.sibling_msfs)
-        .map(function(db) {
-            return find_partner_hcd.bind(self,spectrum)(db);
-        })
+        .map(find_partner_hcd.bind(self,spectrum,glyco_mass))
     ).then(function(partners) {
         partners = Array.prototype.concat.apply([], partners).filter(function(spec) { return spec; });
         return partners;
+    }).catch(function(err) {
+        console.error(err);
     });
 };
+
+const mod_masses = {
+    'HexNAc' : 203.079373,
+    'HexHexNAc' : 365.132196,
+    'Hex1HexNAc1' : 365.132196
+};
+
+var calculate_glyco_composition = function(composition,mods) {
+    return composition.map(function(comp) {
+        var bits = comp.split('x');
+        var count = parseInt(bits.shift());
+        var mass = mod_masses[bits.join('x')];
+        if ( ! mass ) {
+            console.log("Missing mass for ",bits.join('x'));
+        }
+        return count * mass;
+    }).reduce(function(curr,next) { return curr+next; },0);
+}
 
 var decide_spectrum = function(db,pep,spectrum) {
     var self = this;
@@ -110,7 +134,8 @@ var decide_spectrum = function(db,pep,spectrum) {
         return;
     }
     if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
-        return search_partner_hcd_in_msfs.bind(self)(spectrum,db)
+        var glyco_mass = calculate_glyco_composition(pep.Composition || peptide.composition(pep.modifications));
+        return search_partner_hcd_in_msfs.bind(self)(spectrum,db,glyco_mass)
                .then(check_galnac_glcnac_ratio.bind(null,pep));
     }
     return check_galnac_glcnac_ratio(pep,spectrum);

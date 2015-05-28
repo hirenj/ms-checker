@@ -20,14 +20,14 @@ WHERE (ProcessingNodeParentNumber LIKE ? \
         )';
 
 const retrieve_spectrum_sql = 'SELECT \
-    Spectrum, Charge, ScanNumbers as scan, RetentionTime as rt \
+    Spectrum, Charge, ScanNumbers as scan, RetentionTime as rt, Mass \
 FROM SpectrumHeaders \
     LEFT JOIN Spectra USING (UniqueSpectrumID) \
 WHERE SpectrumID = ?';
 
 
 const retrieve_spectrum_from_node_sql = 'SELECT \
-    Spectrum, Charge, ScanNumbers as scan, RetentionTime as rt \
+    Spectrum, Charge, ScanNumbers as scan, RetentionTime as rt, Mass \
 FROM SpectrumHeaders \
     LEFT JOIN Spectra USING (UniqueSpectrumID) \
 WHERE SpectrumID = ? AND SpectrumHeaders.CreatingProcessingNodeNumber = ?';
@@ -41,6 +41,17 @@ WHERE MassPeakID IN ( \
         FROM SpectrumHeaders \
         WHERE SpectrumID = ? \
 )';
+
+const retrieve_related_spectra_by_data_sql = 'SELECT SpectrumID \
+FROM SpectrumHeaders \
+WHERE \
+    (ScanNumbers = ? OR ScanNumbers = ? OR ScanNumbers = ?) \
+AND \
+    RetentionTime < ? AND RetentionTime > ? - 0.03 \
+AND \
+    Charge = ? \
+AND \
+    Mass < ? + 0.01 AND Mass > ? - 0.01';
 
 var spectrum_caches = {};
 
@@ -199,34 +210,43 @@ var init_spectrum_processing_num = function(db) {
     });
 };
 
-var get_spectrum = function(db,pep,processing_node) {
+var get_spectrum = function(db,pep,processing_node,no_cache) {
     var spectrum_promise;
     if (processing_node === 0) {
         processing_node = null;
     }
-    if ( ! spectrum_caches[pep.SpectrumID] ) {
+    if ( ! spectrum_caches[pep.SpectrumID] || no_cache ) {
         if ( typeof processing_node !== 'undefined' && processing_node !== null ) {
             spectrum_promise = db.all(retrieve_spectrum_from_node_sql, [ pep.SpectrumID, processing_node ]);
         } else {
             spectrum_promise = db.all(retrieve_spectrum_sql, [ pep.SpectrumID ]);
         }
     }
-    spectrum_caches[pep.SpectrumID] = spectrum_caches[pep.SpectrumID] || spectrum_promise.then(function(spectra) {
+    var cache_id = pep.SpectrumID;
+    if (no_cache) {
+        cache_id = Math.random().toString(36).substring(10);
+    }
+    spectrum_caches[cache_id] = spectrum_caches[cache_id] || spectrum_promise.then(function(spectra) {
         if (spectra.length == 0) {
-            delete spectrum_caches[pep.SpectrumID];
+            delete spectrum_caches[cache_id];
             return;
         }
         var spectrum = spectra[0].Spectrum;
         var charge = spectra[0].Charge;
+        var mass = spectra[0].Mass;
+        var scan = spectra[0].scan;
         pep.retentionTime = spectra[0].rt;
         pep.scan = spectra[0].scan;
         return unzip_spectrum(spectrum).then(parse_spectrum).then(function(spectrum){
             spectrum.spectrumID = pep.SpectrumID;
             spectrum.charge = charge;
+            spectrum.mass = mass;
+            spectrum.scan = scan;
+            spectrum.rt = pep.retentionTime;
             return spectrum;
         });
     });
-    return spectrum_caches[pep.SpectrumID];
+    return spectrum_caches[cache_id];
 };
 
 var get_related_spectra = function(db,spectrum) {
@@ -240,6 +260,14 @@ var get_related_spectra = function(db,spectrum) {
     });
 };
 
+var match_spectrum_data = function(db, scan, rt, charge, mass) {
+    return db.all(retrieve_related_spectra_by_data_sql,[parseInt(scan) - 1,parseInt(scan) -2 ,parseInt(scan) - 3,rt,rt,charge,mass,mass]).then(function(spec_ids) {
+        return Promise.all((spec_ids || []).map(function(spec_id) {
+            return get_spectrum(db,spec_id,null,true);
+        }));
+    });
+};
+
 var clear_caches = function() {
     spectrum_caches = {};
 };
@@ -247,5 +275,6 @@ var clear_caches = function() {
 exports.init_spectrum_processing_num = init_spectrum_processing_num;
 exports.get_spectrum = get_spectrum;
 exports.get_related_spectra = get_related_spectra;
+exports.match_spectrum_data = match_spectrum_data;
 exports.clear_caches = clear_caches;
 

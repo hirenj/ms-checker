@@ -207,6 +207,7 @@ var combine_all_peptides = function(peps) {
         var high_sn = false;
         var has_possible_mods = false;
         var hexnac_type = {};
+        var hexnac_ratios = [];
         var max_score = null;
 
         var spectra = [];
@@ -227,6 +228,7 @@ var combine_all_peptides = function(peps) {
                 if (("GlcNAc" in hexnac_type || "GalNAc" in hexnac_type)) {
                     delete hexnac_type['Unknown'];
                 }
+                hexnac_ratios.push((pep.galnac_intensity/pep.glcnac_intensity).toFixed(2));
             }
             if ("possible_mods" in pep) {
                 has_possible_mods = true;
@@ -245,6 +247,7 @@ var combine_all_peptides = function(peps) {
         }
         if (Object.keys(hexnac_type).length > 0) {
             block.hexnac_type = Object.keys(hexnac_type);
+            block.hexnac_ratio = hexnac_ratios.join(',');
         }
         if (first_pep.modifications) {
             block.sites = first_pep.modifications.map(function(mod) { return [ mod[0], mod[1] ]; } );
@@ -263,7 +266,7 @@ var combine_all_peptides = function(peps) {
 
         if (has_possible_mods) {
             block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);
-            block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).length > 0 ? 'fragmentation' : '';
+            block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).length > 0 ? 'missing_site_coverage' : '';
         } else {
             block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).map(function(pep) { return pep.made_ambiguous; }).filter(onlyUnique)[0];
             if (! block.made_ambiguous) {
