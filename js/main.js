@@ -1,3 +1,9 @@
+
+// Under Node-webkit we need to rebuild the sqlite package
+
+// NODE_WEBKIT_VERSION="0.12.0"
+// npm install sqlite3 --build-from-source --runtime=node-webkit --target_arch=x64 --target=$NODE_WEBKIT_VERSION
+
 var gui = null;
 
 try {
@@ -31,6 +37,8 @@ if (gui) {
             console.log(ex.message);
         }
     })();
+} else {
+    nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
 }
 var files_to_open = nconf.get('_') || [];
 

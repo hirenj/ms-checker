@@ -2,7 +2,7 @@ var fs      = require('fs'),
     sqlite3 = require('sqlite3');
 
 var nconf = require('nconf');
-
+var ProgressBar = require('progress');
 
 Math.median = require('../js/math-median').median;
 
@@ -20,15 +20,83 @@ var peptide = require('../js/peptide');
 
 var spectra = require('../js/spectrum');
 
+var ProgressBar = require('progress');
+
 ambiguous.conf = nconf;
 hexnac_hcd.conf = nconf;
 
+var progress_bars = {};
+
+function Multibar(stream) {
+  this.stream     = stream || process.stderr;
+  this.cursor     = 0;
+  this.bars       = [];
+  this.terminates = 0;
+};
+
+Multibar.prototype = {
+  newBar: function(schema, options) {
+    options.stream = this.stream;
+    var bar = new ProgressBar(schema, options);
+    this.bars.push(bar);
+    var index = this.bars.length - 1;
+
+    // alloc line
+    this.move(index);
+    this.stream.write('\n');
+    this.cursor ++;
+
+    // replace original
+    var self  = this;
+    bar.otick = bar.tick;
+    bar.oterminate = bar.terminate;
+    bar.tick = function(value, options) {
+      self.tick(index, value, options);
+    }
+    bar.terminate = function() {
+      self.terminates++;
+      if (self.terminates == self.bars.length) {
+        self.terminate();
+      }
+    }
+
+    return bar;
+  },
+
+  terminate: function() {
+    this.move(this.bars.length);
+    this.stream.clearLine();
+    this.stream.cursorTo(0);
+  },
+
+  move: function(index) {
+    if (!this.stream.isTTY) return;
+    this.stream.moveCursor(0, index - this.cursor);
+    this.cursor = index;
+  },
+
+  tick: function(index, value, options) {
+    var bar = this.bars[index];
+    if (bar) {
+      this.move(index);
+      bar.otick(value, options);
+    }
+  }
+};
+
+var mbars = new Multibar();
+
 [quantitative,ambiguous,hexnac_hcd,fragmentation,peptide].forEach(function(module) {
     module.on('task',function(desc) {
-        console.log(module.constructor.name,desc);
         this.addListener('progress',function(percentage) {
-            console.log(module.constructor.name,desc, (100*percentage).toFixed(0));
+            if ( ! progress_bars[module.constructor.name+desc] ) {
+                progress_bars[module.constructor.name+desc] = mbars.newBar(module.constructor.name+" "+desc+' [:bar] ', { total: 100} );
+            }
+
+            var progress = progress_bars[module.constructor.name+desc];
+            progress.tick( (100*percentage).toFixed(0) - progress.curr );
             if (percentage == 1) {
+                delete progress_bars[module.constructor.name+desc];
                 module.removeListener('progress',arguments.callee);
             }
         });
