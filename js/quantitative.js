@@ -328,7 +328,8 @@ var produce_peptide_modification_data = function(db,pep) {
             db.each(all_peptide_modifications_sql,[],function(err,mods) {
                 idx += 1;
                 peptide_modifications_cache[mods.PeptideID] =  peptide_modifications_cache[mods.PeptideID] || [];
-                peptide_modifications_cache[mods.PeptideID].push([ mods.Position < 0 ? 1 : mods.Position + 1, mods.ModificationName, mods.DeltaMass ]);
+                var mod_name = mods.ModificationName.replace(/-/g,'');
+                peptide_modifications_cache[mods.PeptideID].push([ mods.Position < 0 ? 1 : mods.Position + 1, mod_name, mods.DeltaMass ]);
                 exports.notify_progress(idx,total_count);
             }).then(function() {
                 exports.notify_progress(total_count,total_count);
