@@ -202,7 +202,6 @@ var combine_all_peptides = function(peps) {
             return;
         }
         var first_pep = peps[0];
-
         var quant = null;
         var high_sn = false;
         var has_possible_mods = false;
@@ -211,6 +210,7 @@ var combine_all_peptides = function(peps) {
         var max_score = null;
 
         var spectra = [];
+        var activations = [];
 
         peps.forEach(function(pep) {
             if ("CalculatedRatio" in pep) {
@@ -226,14 +226,20 @@ var combine_all_peptides = function(peps) {
             if ("hexnac_type" in pep) {
                 hexnac_type[pep.hexnac_type] = true;
                 if (("GlcNAc" in hexnac_type || "GalNAc" in hexnac_type)) {
-                    delete hexnac_type['Unknown'];
+                    delete hexnac_type['unclear'];
+                    delete hexnac_type['ND'];
                 }
-                hexnac_ratios.push((pep.galnac_intensity/pep.glcnac_intensity).toFixed(2));
+                if (pep.hexnac_type == 'ND') {
+                    hexnac_ratios.push('ND');
+                } else {
+                    hexnac_ratios.push((pep.galnac_intensity/pep.glcnac_intensity).toFixed(2));
+                }
             }
             if ("possible_mods" in pep) {
                 has_possible_mods = true;
             }
             spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan } );
+            activations.push( pep.activation );
         });
         var block = {
             'multi_protein' : false,
@@ -246,7 +252,7 @@ var combine_all_peptides = function(peps) {
             block.quant = isNaN(parseInt(quant)) ? {'quant' : quant } : {'quant' : quant, 'mad' : first_pep.CalculatedRatio_mad };
         }
         if (Object.keys(hexnac_type).length > 0) {
-            block.hexnac_type = Object.keys(hexnac_type);
+            block.hexnac_type = Object.keys(hexnac_type).sort();
             block.hexnac_ratio = hexnac_ratios.join(',');
         }
         if (first_pep.modifications) {
@@ -263,6 +269,7 @@ var combine_all_peptides = function(peps) {
         block.peptide_start = first_pep.pep_start + 1;
 
         block.spectra = spectra;
+        block.activation = activations.filter(onlyUnique);
 
         if (has_possible_mods) {
             block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);

@@ -240,14 +240,11 @@ var get_spectrum = function(db,pep,processing_node,no_cache) {
             spectrum.mass = mass;
             spectrum.scan = scan;
             spectrum.rt = pep.retentionTime;
+            pep.activation = spectrum.activation;
             return spectrum;
         });
     });
-    var result = spectrum_caches[cache_id];
-    // if (no_cache) {
-    //     delete spectrum_caches[cache_id];
-    // }
-    return result;
+    return spectrum_caches[cache_id];
 };
 
 var get_related_spectra = function(db,spectrum) {
@@ -265,7 +262,7 @@ var match_spectrum_data = function(db, scan, rt, charge, mass) {
     var wanted_scan = parseInt(scan);
     return db.do_statement(retrieve_related_spectra_by_data_sql,[rt - 0.03,rt + 0.03,charge,mass-0.01,mass+0.01]).then(function(spec_ids) {
         var wanted_spec_ids = (spec_ids || []).filter(function(spec) {  return Math.abs(wanted_scan - parseInt(spec.ScanNumbers)) <= 3;  });
-        return Promise.all((spec_ids || []).map(function(spec_id) {
+        return Promise.all(wanted_spec_ids.map(function(spec_id) {
             return get_spectrum(db,spec_id,null,db.partner);
         }));
     });

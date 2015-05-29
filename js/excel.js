@@ -2,7 +2,7 @@ var xlsx = require('node-xlsx');
 var fs = require('fs');
 
 var write_excel_file = function(datablock,filename) {
-    var rows = [[ "source", "uniprot", "gene","multiple_proteins", "peptide_id", "quant" , "quant_mad", "hexnac_type", "hexnac_ratio", "sequence", "peptide_start", "composition", "spectra", "etd_eval" , "site", "ambiguous"  ]];
+    var rows = [[ "source", "uniprot", "gene","multiple_proteins", "peptide_id", "quant" , "quant_mad", "hexnac_type", "hexnac_ratio", "sequence", "peptide_start", "peptide_end", "composition", "score", "spectra", "activation", "etd_eval" , "site", "site_composition", "ambiguous"  ]];
     var metadata = [];
     var peptide_id = 0;
     if (! Array.isArray(datablock.metadata) && datablock.metadata ) {
@@ -41,21 +41,24 @@ var write_excel_file = function(datablock,filename) {
             }
             data.push(pep.sequence);
             data.push(pep.peptide_start);
+            data.push(pep.peptide_start + pep.sequence.length - 1);
             data.push(pep.composition.join(';'));
-            data.push(pep.spectra.map(function(spec) {  return spec.score +"-" + spec.rt + "-" + spec.scan;  }).join(","));
+            data.push(pep.spectra.map(function(spec) {  return spec.score ? spec.score.toFixed(2) : 'ND';  }).join(","));
+            data.push(pep.spectra.map(function(spec) {  return spec.rt + "-" + spec.scan;  }).join(","));
+            data.push(pep.activation.join(','));
             data.push(pep.made_ambiguous || '');
             if (pep.sites) {
                 pep.sites.forEach(function(site) {
-                    rows.push(data.concat([site[0]]));
+                    rows.push(data.concat([site[0],site[1]]));
                 });
             }
             if (pep.ambiguous_mods) {
                 pep.ambiguous_mods.forEach(function(ambig) {
-                    rows.push(data.concat([null,ambig]));
+                    rows.push(data.concat([null,null,ambig]));
                 });
             }
             if (! pep.sites && ! pep.ambiguous_mods) {
-                rows.push(data.concat([ null,null ]));
+                rows.push(data.concat([ null,null,null ]));
             }
         });
     });

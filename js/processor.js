@@ -90,7 +90,8 @@ var mbars = new Multibar();
     module.on('task',function(desc) {
         this.addListener('progress',function(percentage) {
             if ( ! progress_bars[module.constructor.name+desc] ) {
-                progress_bars[module.constructor.name+desc] = mbars.newBar(module.constructor.name+" "+desc+' [:bar] ', { total: 100} );
+                var barname = (module.constructor.name+" "+desc+(Array(50).join(' '))).substring(0,50);
+                progress_bars[module.constructor.name+desc] = mbars.newBar(barname+' [:bar] ', { total: 100} );
             }
 
             var progress = progress_bars[module.constructor.name+desc];

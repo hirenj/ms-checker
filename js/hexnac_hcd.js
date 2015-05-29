@@ -159,6 +159,10 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
         });
         return;
     }
+    if ( ! partner ) {
+        pep.activation = spectrum.activation;
+    }
+
     if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
         return;
     }
@@ -168,9 +172,6 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
     var glcnac_masses = [];
 
     var error = this.error || {'ppm' : 15};
-    if ( ! partner ) {
-        pep.activation = spectrum.activation;
-    }
 
     // Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
     // if it is within 0.4 - 0.6, it is a GalNAc, 2.0 or greater, GlcNAc
@@ -196,14 +197,18 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
     }
     if (galnac_count == 2 && glcnac_count == 2) {
         var ratio = galnac_intensity / glcnac_intensity;
-        var hexnac_type = (ratio <= 0.95) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'Unknown' );
-        if (! pep.hexnac_type || pep.hexnac_type == 'Unknown') {
+        var hexnac_type = (ratio <= 1.3) ? 'GalNAc' : ( (ratio >= 1.95) ? 'GlcNAc' : 'unclear' );
+        if (! pep.hexnac_type || pep.hexnac_type == 'unclear' || pep.hexnac_type == 'ND') {
             pep.galnac_intensity = galnac_intensity;
             pep.glcnac_intensity = glcnac_intensity;
             pep.hexnac_type = hexnac_type;
         } else if (pep.hexnac_type && pep.hexnac_type != hexnac_type ) {
             console.log("Conflicting HexNAc types ", pep.hexnac_type,hexnac_type);
         }
+    } else {
+        pep.galnac_intensity = 0;
+        pep.glcnac_intensity = 0;
+        pep.hexnac_type = 'ND';
     }
     return;
 };
