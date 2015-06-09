@@ -189,6 +189,7 @@ var process_data = function(filename,sibling_files) {
                 global_datablock.data = peptide.combine(peps);
                 quantitative.clear_caches();
                 spectra.clear_caches();
+                fragmentation.clear_caches();
                 return global_datablock;
             });
         });

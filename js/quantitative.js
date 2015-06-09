@@ -354,6 +354,7 @@ var clear_caches = function() {
     validated_quans_cache = {};
     dimethyl_count_cache = null;
     peptide_modifications_cache = {'empty' : true };
+    exports.modifications_cache = peptide_modifications_cache;
 };
 
 exports.init_caches = init_caches;

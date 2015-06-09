@@ -321,7 +321,7 @@ var calculate_fragment_ions = function(pep,spectrum_charge) {
     }
     return ions;
 };
-
+exports.clear_caches = function() { cached_node_filters = {}; };
 exports.validate_peptide_coverage = validate_peptide_coverage;
 exports.matched_ions = matched_ions;
 exports.theoretical_ions = theoretical_ions;
