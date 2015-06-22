@@ -322,7 +322,7 @@ var rescale_ids = function(old,new_pos,peptide) {
             comp[0] = parseInt(comp[0]) - old + new_pos;
         });
     }
-    peptide.peptide_start = new_pos;
+    peptide.peptide_start = new_pos + 1;
 }
 
 
