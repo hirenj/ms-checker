@@ -118,10 +118,33 @@ var combine_all_peptides = function(peps) {
         check_single_site(pep);
 
         var pep_key = pep.Sequence+"-"+peptide.modification_key(pep);
+        var current_uniprots = [];
+        var current_starts = [];
+
         if ( ! grouped_peptides[pep_key] ) {
             grouped_peptides[pep_key] = [];
+        } else {
+            current_uniprots = grouped_peptides[pep_key][0].uniprot;
+            current_starts = grouped_peptides[pep_key][0].starts || [grouped_peptides[pep_key][0].pep_start];
+        }
+        if (typeof pep.starts == 'undefined') {
+            if (current_uniprots.indexOf(pep.uniprot[0]) < 0) {
+                current_uniprots.push(pep.uniprot[0]);
+                current_starts.push(pep.pep_start);
+            }
+        }
+        for (var i = 0; i < (pep.starts || []).length; i++) {
+            if (current_uniprots.indexOf(pep.uniprot[i]) < 0) {
+                current_uniprots.push(pep.uniprot[i]);
+                current_starts.push(pep.starts[i]);
+            }
         }
         grouped_peptides[pep_key].push(pep);
+        if (current_uniprots.length > 1) {
+            grouped_peptides[pep_key][0].starts = current_starts;
+        } else {
+            grouped_peptides[pep_key][0].pep_start = current_starts[0];
+        }
     });
 
     // Search by Peptide / (modifications + ambig key)
