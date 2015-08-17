@@ -58,7 +58,7 @@ if (sources && ! Array.isArray(sources)) {
 // Check for the ETD parent mass + RT + scan in all the files
 
 processor.process(files_to_open,sources).then(function(blocks) { return processor.combine(blocks,sources) }).then(function(combined) {
-    console.log(combined);
+    // console.log(combined);
     if (nconf.get('output')) {
         fs.writeFile(nconf.get('output')+'.json',JSON.stringify(combined),function() {
             console.log("Wrote combined file");
