@@ -295,7 +295,12 @@ var combine_all_peptides = function(peps) {
         block.activation = activations.filter(onlyUnique);
 
         if (has_possible_mods) {
-            block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) { return write_possible_mods(pep.possible_mods); }).filter(onlyUnique);
+            block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) {
+                var written_mods = write_possible_mods(pep.possible_mods);
+                var temp_block = {'ambiguous_mods' : [written_mods] };
+                rescale_ids(pep.pep_start, first_pep.pep_start, temp_block);
+                return temp_block.ambiguous_mods[0];
+            }).filter(onlyUnique);
             block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).length > 0 ? 'missing_site_coverage' : '';
         } else {
             block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).map(function(pep) { return pep.made_ambiguous; }).filter(onlyUnique)[0];
