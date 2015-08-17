@@ -262,7 +262,9 @@ var retrieve_quantified_peptides = function(db) {
     });
     return db.each(search_peptides_sql,[],function(err,pep) {
         idx += 1;
-        peps.push(pep);
+        if (pep) {
+            peps.push(pep);
+        }
         exports.notify_progress(idx,total_count);
     }).then(function() {
         exports.notify_progress(total_count,total_count);

@@ -55,7 +55,9 @@ var produce_peptide_score_data = function(db,pep) {
                 }
             });
             db.each(peptide_score_sql,[],function(err,score) {
-                peptide_scores_cache[score.PeptideID] = score.ScoreValue;
+                if ( score ) {
+                    peptide_scores_cache[score.PeptideID] = score.ScoreValue;
+                }
                 idx += 1;
                 exports.notify_progress(idx,total_count);
             }).then(function() {
