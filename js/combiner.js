@@ -244,6 +244,8 @@ var combine_all_peptides = function(peps) {
                 high_sn = true;
             }
             if ("has_pair" in pep && pep.has_pair === true && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
+                // Potential ratio 1/100000 in the potential_light
+                // Potential ratio 100000 in the potential_medium 
                 quant = pep.QuanChannelID[0] == 1 ? 'potential_light' : 'potential_medium';
             }
             if ("hexnac_type" in pep) {
