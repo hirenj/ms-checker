@@ -28,7 +28,8 @@ FROM FileInfos \
             FileInfos.FileName LIKE "%xT.%" \
         OR \
             FileInfos.FileName LIKE "%xTn.%" \
-        ) \
+        ) AND \
+            FileInfos.Filename NOT LIKE "%raw" \
     AND \
         Peptides.ConfidenceLevel = 3';
 
