@@ -1,0 +1,98 @@
+<ProcessingMethod name="Dimethylation 2plex(C2H6, C2H2D4)" version="1" selected="ExperimentalBias" class="f1e49e3c-4374-4bd6-8bc5-0b19248cfc8c" description="Dimethylation 2plex (C2H4, C2D4) Method" isActive="True" majorVersion="1" minorVersion="0">
+  <MethodPart name="QuanChannels" version="1" selected="Medium">
+    <MethodPart name="Light" version="1" selected="QuanLabels">
+      <Parameter name="ChannelID">1</Parameter>
+      <Parameter name="ChannelName">Light</Parameter>
+      <MethodPart name="QuanLabels" version="1" selected="Dimethyl(N-Term)">
+        <MethodPart name="Dimethyl(K)" version="2" selected="ModificationTarget">
+          <Parameter name="LabelID">1</Parameter>
+          <Parameter name="LabelName">Dimethyl(K)</Parameter>
+          <MethodPart name="ModificationTarget" version="1" selected="SideChainModification">
+            <MethodPart name="SideChainModification" version="1">
+              <Parameter name="Modification">&lt;Modification Version="1" AminoAcids="K" Name="Dimethyl" Abbreviation="Dimethyl" ID="47" UnimodAccession="36" DeltaMass="28.03130" DeltaAverageMass="28.05320" IsSubstitution="False" LeavingGroup="" Substitution="H(4) C(2)" PositionType="Any" /&gt;</Parameter>
+            </MethodPart>
+            <MethodPart name="NTermModification" version="1" />
+            <MethodPart name="CTermModification" version="1" />
+          </MethodPart>
+        </MethodPart>
+        <MethodPart name="Dimethyl(N-Term)" version="2" selected="ModificationTarget">
+          <Parameter name="LabelID">2</Parameter>
+          <Parameter name="LabelName">Dimethyl(N-Term)</Parameter>
+          <MethodPart name="ModificationTarget" version="1" selected="NTermModification">
+            <MethodPart name="SideChainModification" version="1" />
+            <MethodPart name="NTermModification" version="1">
+              <Parameter name="Modification">&lt;Modification Version="1" Terminus="Any_N_Terminus" Name="Dimethyl" Abbreviation="Dimethyl" ID="48" UnimodAccession="36" DeltaMass="28.03130" DeltaAverageMass="28.05320" IsSubstitution="False" LeavingGroup="" Substitution="H(4) C(2)" PositionType="Any_N_Terminus" /&gt;</Parameter>
+            </MethodPart>
+            <MethodPart name="CTermModification" version="1" />
+          </MethodPart>
+        </MethodPart>
+      </MethodPart>
+    </MethodPart>
+    <MethodPart name="Medium" version="1" selected="QuanLabels">
+      <Parameter name="ChannelID">2</Parameter>
+      <Parameter name="ChannelName">Medium</Parameter>
+      <MethodPart name="QuanLabels" version="1" selected="Dimethyl(K) Medium">
+        <MethodPart name="Dimethyl(K) Medium" version="2" selected="ModificationTarget">
+          <Parameter name="LabelID">1</Parameter>
+          <Parameter name="LabelName">Dimethyl(K) Medium</Parameter>
+          <MethodPart name="ModificationTarget" version="1" selected="SideChainModification">
+            <MethodPart name="SideChainModification" version="1">
+              <Parameter name="Modification">&lt;Modification Version="1" AminoAcids="K" Name="Dimethyl:2H(4)" Abbreviation="Dimethyl:2H(4)" ID="209" UnimodAccession="199" DeltaMass="32.05641" DeltaAverageMass="32.07780" IsSubstitution="False" LeavingGroup="" Substitution="2H(4) C(2)" PositionType="Any" /&gt;</Parameter>
+            </MethodPart>
+            <MethodPart name="NTermModification" version="1" />
+            <MethodPart name="CTermModification" version="1" />
+          </MethodPart>
+        </MethodPart>
+        <MethodPart name="Dimethyl(N-Term) Medium" version="2" selected="ModificationTarget">
+          <Parameter name="LabelID">2</Parameter>
+          <Parameter name="LabelName">Dimethyl(N-Term) Medium</Parameter>
+          <MethodPart name="ModificationTarget" version="1" selected="NTermModification">
+            <MethodPart name="SideChainModification" version="1" />
+            <MethodPart name="NTermModification" version="1">
+              <Parameter name="Modification">&lt;Modification Version="1" Terminus="Any_N_Terminus" Name="Dimethyl:2H(4)" Abbreviation="Dimethyl:2H(4)" ID="208" UnimodAccession="199" DeltaMass="32.05641" DeltaAverageMass="32.07780" IsSubstitution="False" LeavingGroup="" Substitution="2H(4) C(2)" PositionType="Any_N_Terminus" /&gt;</Parameter>
+            </MethodPart>
+            <MethodPart name="CTermModification" version="1" />
+          </MethodPart>
+        </MethodPart>
+      </MethodPart>
+    </MethodPart>
+  </MethodPart>
+  <MethodPart name="RatioReporting" version="1" selected="Medium/Light">
+    <MethodPart name="Medium/Light" version="1">
+      <Parameter name="RatioName">Medium/Light</Parameter>
+      <Parameter name="Numerator">Medium</Parameter>
+      <Parameter name="Denominator">Light</Parameter>
+    </MethodPart>
+  </MethodPart>
+  <MethodPart name="RatioCalculation" version="4">
+    <Parameter name="ShowRawQuanValues">False</Parameter>
+    <Parameter name="MinimumQuanValueThreshold">0</Parameter>
+    <Parameter name="ReplaceMissingReporterIntensitiesWithMinimum">False</Parameter>
+    <Parameter name="UseSinglePeakQuanChannels">True</Parameter>
+    <Parameter name="ApplyQuanValueCorrections">True</Parameter>
+    <Parameter name="RejectQuanValuesIfNotAllQuanChannelsArePresent">False</Parameter>
+    <Parameter name="UpDownRegulationThreshold">2</Parameter>
+    <Parameter name="MaximumAllowedFoldChange">100000</Parameter>
+    <Parameter name="UseExtremeRatiosForQuantitation">True</Parameter>
+    <Parameter name="IsolationInterferenceThreshold">100</Parameter>
+  </MethodPart>
+  <MethodPart name="ProteinQuantitation" version="2" selected="UseAllPeptides">
+    <Parameter name="ShowPeptideRatioCounts">True</Parameter>
+    <Parameter name="ShowVariabilities">True</Parameter>
+    <Parameter name="ConsiderProteinGroupsForPeptideUniqueness">True</Parameter>
+    <MethodPart name="UseOnlyUniquePeptides" version="2" />
+    <MethodPart name="UseAllPeptides" version="1" />
+  </MethodPart>
+  <MethodPart name="ExperimentalBias" version="1" selected="NoneMethod">
+    <MethodPart name="NoneMethod" version="1" />
+    <MethodPart name="NormalizeOnProteinMedian" version="1">
+      <Parameter name="MinimumProteinCount">20</Parameter>
+    </MethodPart>
+    <MethodPart name="ManualNormalization" version="1">
+      <Parameter name="NormalizationFactor">1</Parameter>
+    </MethodPart>
+  </MethodPart>
+  <MethodPart name="OutlierDetection" version="1" selected="NoneMethod">
+    <MethodPart name="NoneMethod" version="1" />
+  </MethodPart>
+</ProcessingMethod>

@@ -54,6 +54,12 @@ FROM PeptidesAminoAcidModifications \
 WHERE PeptideID = ?';
 
 
+const quant_channel_config_sql = 'SELECT \
+    ParameterValue \
+FRIN ProcessingNodeParameters \
+WHERE ParameterName = "QuantificationMethod"';
+
+
 const all_peptide_modifications_sql = 'SELECT \
     PeptideID, Position, ModificationName, DeltaMass \
 FROM PeptidesAminoAcidModifications \
@@ -231,12 +237,14 @@ var check_potential_pair = function(db,pep,num_dimethyl) {
     });
 };
 
+
+// Channel identifier found in
+// ProcessingNodeParameters.ParameterName QuantificationMethod
 var combine_quantified_peptides = function(peps) {
     var all_peps = {};
     peps.forEach(function(pep) {
         var curr_pep = all_peps[pep.PeptideID] ||  pep;
         curr_pep.areas = curr_pep.areas || [];
-
         if (! Array.isArray(curr_pep.QuanChannelID) ) {
             curr_pep.QuanChannelID =  curr_pep.QuanChannelID ? [ curr_pep.QuanChannelID ] : [];
         }
@@ -246,10 +254,28 @@ var combine_quantified_peptides = function(peps) {
         if (pep.Area) {
             curr_pep.areas.push(pep.Area);
         }
+        if (curr_pep.areas.length != curr_pep.QuanChannelID.length) {
+            throw new Error("quant_channel_counts")
+        }
         all_peps[pep.PeptideID] = curr_pep;
     });
     return Object.keys(all_peps).map(function(key) { return all_peps[key]; });
 };
+
+var get_channel_config = function(db) {
+    db.all(quant_channel_config_sql).then(function(xml) {
+        return new Promise(function(reject,resolve) {
+            require('xml2js').parseString(xml,function(err,result) {
+                if (err) {
+                    throw err;
+                }
+                debugger;
+                result.ProcessingMethod.MethodPart[0].MethodPart.map(function(method) {
+                });
+            });
+        });
+    });
+}
 
 var retrieve_quantified_peptides = function(db) {
     var peps = [];
