@@ -175,7 +175,7 @@ var combine_all_peptides = function(peps) {
                 var seen = pep.QuanResultID in seen_quan_result_ids;
                 seen_quan_result_ids[pep.QuanResultID] = 1;
                 return ! seen;
-            }).map(function(pep) { return pep.areas[1] / pep.areas[0]; });
+            }).map(function(pep) { return pep.areas["medium"] / pep.areas["light"]; });
 
             target_ratio = Math.median( all_ratios );
 
@@ -195,7 +195,7 @@ var combine_all_peptides = function(peps) {
 
         } else if (singlet_peps.length > 0)  {
 
-            target_ratio = singlet_peps[0].QuanChannelID[0] == 1 ? 1/100000 : 100000;
+            target_ratio = singlet_peps[0].QuanChannelID[0] == "light" ? 1/100000 : 100000;
 
             var channel_ids = singlet_peps.map(function(pep) { return pep.QuanChannelID[0]; }).filter(onlyUnique);
 
@@ -246,7 +246,7 @@ var combine_all_peptides = function(peps) {
             if ("has_pair" in pep && pep.has_pair === true && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
                 // Potential ratio 1/100000 in the potential_light
                 // Potential ratio 100000 in the potential_medium 
-                quant = pep.QuanChannelID[0] == 1 ? 'potential_light' : 'potential_medium';
+                quant = pep.QuanChannelID[0] == "light" ? 'potential_light' : 'potential_medium';
             }
             if ("hexnac_type" in pep) {
                 hexnac_type[pep.hexnac_type] = true;
