@@ -251,6 +251,9 @@ var combine_quantified_peptides = function(peps,channel_conf) {
             pep.QuanChannelID = channel_conf[pep.QuanChannelID];
         }
         if (pep.Area && pep.QuanChannelID) {
+            if (pep.QuanChannelID != 'medium' && pep.QuanChannelID != 'light') {
+                throw new Error("Could not resolve Quant channel ID",pep.QuanChannelID);
+            }
             curr_pep.areas[pep.QuanChannelID] = pep.Area;
         }
         if (! Array.isArray(curr_pep.QuanChannelID) ) {
@@ -285,6 +288,9 @@ var extract_channel_info = function(channel_info) {
 var get_channel_config = function(db) {
     return db.all(quant_channel_config_sql).then(function(xml) {
         return new Promise(function(resolve,reject) {
+            if ( ! xml || xml.length < 1 ) {
+                resolve([]);
+            }
             require('xml2js').parseString(xml[0].ParameterValue,function(err,result) {
                 if (err) {
                     throw err;
@@ -333,7 +339,9 @@ var check_quantified_peptides = function(db,peps) {
     var setup_config = get_channel_config(db).then(function(quant_config) {
         var channel_conf = {};
         if (quant_config.length != 2) {
-            throw new Error("Incorrect number of quant channels");
+            if (peps.length > 0) {
+                throw new Error("Incorrect number of quant channels");
+            }
         }
         quant_config.forEach(function(conf) {
             channel_conf[ conf.ChannelName.toLowerCase() ] = conf.ChannelID;
