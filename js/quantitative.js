@@ -54,6 +54,12 @@ FROM PeptidesAminoAcidModifications \
 WHERE PeptideID = ?';
 
 
+const quant_channel_config_sql = 'SELECT \
+    ParameterValue \
+FROM ProcessingNodeParameters \
+WHERE ParameterName = "QuantificationMethod"';
+
+
 const all_peptide_modifications_sql = 'SELECT \
     PeptideID, Position, ModificationName, DeltaMass \
 FROM PeptidesAminoAcidModifications \
@@ -161,7 +167,7 @@ we need to find, and one where there is a singlet. Possible minimal method call 
 we can just grab the pair for a given peptide too?
 */
 
-var check_potential_pair = function(db,pep,num_dimethyl) {
+var check_potential_pair = function(db,pep,num_dimethyl,channel_conf) {
     return new Promise(function(resolve,reject) {
         if (! pep.QuanResultID) {
             resolve();
@@ -177,7 +183,7 @@ var check_potential_pair = function(db,pep,num_dimethyl) {
         }
         if ( ! num_dimethyl ) {
             find_dimethyls(db,pep).then(function(count) {
-                resolve(check_potential_pair(db,pep,count));
+                resolve(check_potential_pair(db,pep,count,channel_conf));
             },reject);
             return;
         }
@@ -185,12 +191,14 @@ var check_potential_pair = function(db,pep,num_dimethyl) {
         pep.has_pair = false;
 
         var mass_change_dir = 1;
-        if (pep.QuanChannelID.indexOf(2) >= 0) {
+        if (pep.QuanChannelID.indexOf("medium") >= 0) {
             mass_change_dir = -1;
         }
         var sns = [];
         pep.has_low_sn = false;
-        db.all(related_quants_sql,[ pep.QuanResultID, pep.QuanChannelID.filter(onlyUnique)[0] ]).then(function(events) {
+        var numeric_channel_id = channel_conf[pep.QuanChannelID.filter(onlyUnique)[0]];
+
+        db.all(related_quants_sql,[ pep.QuanResultID, numeric_channel_id ]).then(function(events) {
             var events_length = events.length;
             events.forEach(function(ev) {
 
@@ -231,25 +239,65 @@ var check_potential_pair = function(db,pep,num_dimethyl) {
     });
 };
 
-var combine_quantified_peptides = function(peps) {
+
+// Channel identifier found in
+// ProcessingNodeParameters.ParameterName QuantificationMethod
+var combine_quantified_peptides = function(peps,channel_conf) {
     var all_peps = {};
     peps.forEach(function(pep) {
         var curr_pep = all_peps[pep.PeptideID] ||  pep;
-        curr_pep.areas = curr_pep.areas || [];
-
+        curr_pep.areas = curr_pep.areas || {};
+        if ( pep.QuanChannelID && pep.QuanChannelID != "Medium" || pep.QuanChannelID != "Light" ) {
+            pep.QuanChannelID = channel_conf[pep.QuanChannelID];
+        }
+        if (pep.Area && pep.QuanChannelID) {
+            curr_pep.areas[pep.QuanChannelID] = pep.Area;
+        }
         if (! Array.isArray(curr_pep.QuanChannelID) ) {
             curr_pep.QuanChannelID =  curr_pep.QuanChannelID ? [ curr_pep.QuanChannelID ] : [];
         }
         if (curr_pep != pep && pep.QuanChannelID) {
             curr_pep.QuanChannelID.push(pep.QuanChannelID);
         }
-        if (pep.Area) {
-            curr_pep.areas.push(pep.Area);
+        if (Object.keys(curr_pep.areas).length != curr_pep.QuanChannelID.length) {
+            throw new Error("quant_channel_counts")
         }
         all_peps[pep.PeptideID] = curr_pep;
     });
     return Object.keys(all_peps).map(function(key) { return all_peps[key]; });
 };
+
+var extract_channel_info = function(channel_info) {
+    var params = channel_info.Parameter.map(function(param) {
+        var obj = {};
+        obj[ param['$'].name ] =  param['_'];
+        return obj;
+    });
+    params = params.reduce(function(prev,curr) {
+        for (var key in curr) {
+            prev[key] = curr[key];
+        }
+        return prev;
+    });
+    return params;
+};
+
+var get_channel_config = function(db) {
+    return db.all(quant_channel_config_sql).then(function(xml) {
+        return new Promise(function(resolve,reject) {
+            require('xml2js').parseString(xml[0].ParameterValue,function(err,result) {
+                if (err) {
+                    throw err;
+                }
+                var channel_infos = result.ProcessingMethod.MethodPart.filter(function(part) {
+                    return part.$.name == 'QuanChannels';
+                })[0].MethodPart;
+                var extracted = channel_infos.map(extract_channel_info);
+                resolve(extracted);
+            });
+        });
+    });
+}
 
 var retrieve_quantified_peptides = function(db) {
     var peps = [];
@@ -282,19 +330,34 @@ var check_quantified_peptides = function(db,peps) {
         idx += 1;
         exports.notify_progress(idx,total_peps);
     };
+    var setup_config = get_channel_config(db).then(function(quant_config) {
+        var channel_conf = {};
+        if (quant_config.length != 2) {
+            throw new Error("Incorrect number of quant channels");
+        }
+        quant_config.forEach(function(conf) {
+            channel_conf[ conf.ChannelName ] = conf.ChannelID;
+            channel_conf[ conf.ChannelID ] = conf.ChannelName;
+        });
+        return channel_conf;
+    });
+    var combined_peps = [];
+    return setup_config.then(function(channel_conf) {
+        combined_peps = combine_quantified_peptides(peps,channel_conf);
 
-    var combined_peps = combine_quantified_peptides(peps);
+        var singlet_peps = combined_peps.filter( function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; } );
+        var total_peps = singlet_peps.length + combined_peps.length;
 
-    var singlet_peps = combined_peps.filter( function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; } );
-    var total_peps = singlet_peps.length + combined_peps.length;
+        exports.notify_task('Validating quantified peptides');
+        exports.notify_progress(0,total_peps);
 
-    exports.notify_task('Validating quantified peptides');
-    exports.notify_progress(0,total_peps);
+        var pair_promises = singlet_peps.map( function(pep) { return check_potential_pair(db,pep,null,channel_conf).then(update_fractions); } );
+        var metadata_promises = combined_peps.map( function(pep) { return peptide_search.produce_peptide_data(db,pep).then( produce_peptide_modification_data(db,pep) ).then(update_fractions);  } );
 
-    var pair_promises = singlet_peps.map( function(pep) { return check_potential_pair(db,pep,null).then(update_fractions); } );
-    var metadata_promises = combined_peps.map( function(pep) { return peptide_search.produce_peptide_data(db,pep).then( produce_peptide_modification_data(db,pep) ).then(update_fractions);  } );
-
-    return Promise.all(pair_promises.concat(metadata_promises)).then(function() {
+        return pair_promises.concat(metadata_promises);
+    }).then(function(promises) {
+        return Promise.all(promises);
+    }).then(function() {
         peptide_search.cleanup(db);
         exports.notify_progress(total_peps,total_peps);
         return combined_peps;
