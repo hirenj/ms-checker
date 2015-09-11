@@ -56,7 +56,7 @@ WHERE PeptideID = ?';
 
 const quant_channel_config_sql = 'SELECT \
     ParameterValue \
-FRIN ProcessingNodeParameters \
+FROM ProcessingNodeParameters \
 WHERE ParameterName = "QuantificationMethod"';
 
 
@@ -183,7 +183,7 @@ var check_potential_pair = function(db,pep,num_dimethyl,channel_conf) {
         }
         if ( ! num_dimethyl ) {
             find_dimethyls(db,pep).then(function(count) {
-                resolve(check_potential_pair(db,pep,count));
+                resolve(check_potential_pair(db,pep,count,channel_conf));
             },reject);
             return;
         }
@@ -247,17 +247,17 @@ var combine_quantified_peptides = function(peps,channel_conf) {
     peps.forEach(function(pep) {
         var curr_pep = all_peps[pep.PeptideID] ||  pep;
         curr_pep.areas = curr_pep.areas || {};
-        if ( curr_pep.QuanChannelID != "medium" || curr_pep.QuanChannelID != "light" ) {
-            curr_pep.QuanChannelID = channel_conf[curr_pep.QuanChannelID];
+        if ( pep.QuanChannelID && pep.QuanChannelID != "Medium" || pep.QuanChannelID != "Light" ) {
+            pep.QuanChannelID = channel_conf[pep.QuanChannelID];
+        }
+        if (pep.Area && pep.QuanChannelID) {
+            curr_pep.areas[pep.QuanChannelID] = pep.Area;
         }
         if (! Array.isArray(curr_pep.QuanChannelID) ) {
             curr_pep.QuanChannelID =  curr_pep.QuanChannelID ? [ curr_pep.QuanChannelID ] : [];
         }
         if (curr_pep != pep && pep.QuanChannelID) {
             curr_pep.QuanChannelID.push(pep.QuanChannelID);
-        }
-        if (pep.Area) {
-            curr_pep.areas[pep.QuanChannelID] = pep.Area;
         }
         if (Object.keys(curr_pep.areas).length != curr_pep.QuanChannelID.length) {
             throw new Error("quant_channel_counts")
@@ -283,16 +283,17 @@ var extract_channel_info = function(channel_info) {
 };
 
 var get_channel_config = function(db) {
-    db.all(quant_channel_config_sql).then(function(xml) {
-        return new Promise(function(reject,resolve) {
-            require('xml2js').parseString(xml,function(err,result) {
+    return db.all(quant_channel_config_sql).then(function(xml) {
+        return new Promise(function(resolve,reject) {
+            require('xml2js').parseString(xml[0].ParameterValue,function(err,result) {
                 if (err) {
                     throw err;
                 }
                 var channel_infos = result.ProcessingMethod.MethodPart.filter(function(part) {
                     return part.$.name == 'QuanChannels';
                 })[0].MethodPart;
-                resolve(channel_infos.map(extract_channel_info));
+                var extracted = channel_infos.map(extract_channel_info);
+                resolve(extracted);
             });
         });
     });
@@ -329,19 +330,20 @@ var check_quantified_peptides = function(db,peps) {
         idx += 1;
         exports.notify_progress(idx,total_peps);
     };
-    var channel_conf = {};
     var setup_config = get_channel_config(db).then(function(quant_config) {
+        var channel_conf = {};
         if (quant_config.length != 2) {
             throw new Error("Incorrect number of quant channels");
         }
-        quant_config.forEach(function() {
-            channel_conf[ quant_config.ChannelName ] = quant_config.ChannelID;
-            channel_conf[ quant_config.ChannelID ] = quant_config.ChannelName;
-        })
+        quant_config.forEach(function(conf) {
+            channel_conf[ conf.ChannelName ] = conf.ChannelID;
+            channel_conf[ conf.ChannelID ] = conf.ChannelName;
+        });
+        return channel_conf;
     });
-
-    return setup_config.then(function() {
-        var combined_peps = combine_quantified_peptides(peps,channel_conf);
+    var combined_peps = [];
+    return setup_config.then(function(channel_conf) {
+        combined_peps = combine_quantified_peptides(peps,channel_conf);
 
         var singlet_peps = combined_peps.filter( function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; } );
         var total_peps = singlet_peps.length + combined_peps.length;
