@@ -247,7 +247,7 @@ var combine_quantified_peptides = function(peps,channel_conf) {
     peps.forEach(function(pep) {
         var curr_pep = all_peps[pep.PeptideID] ||  pep;
         curr_pep.areas = curr_pep.areas || {};
-        if ( pep.QuanChannelID && pep.QuanChannelID != "Medium" || pep.QuanChannelID != "Light" ) {
+        if ( pep.QuanChannelID && pep.QuanChannelID != "medium" || pep.QuanChannelID != "light" ) {
             pep.QuanChannelID = channel_conf[pep.QuanChannelID];
         }
         if (pep.Area && pep.QuanChannelID) {
@@ -336,8 +336,8 @@ var check_quantified_peptides = function(db,peps) {
             throw new Error("Incorrect number of quant channels");
         }
         quant_config.forEach(function(conf) {
-            channel_conf[ conf.ChannelName ] = conf.ChannelID;
-            channel_conf[ conf.ChannelID ] = conf.ChannelName;
+            channel_conf[ conf.ChannelName.toLowerCase() ] = conf.ChannelID;
+            channel_conf[ conf.ChannelID ] = conf.ChannelName.toLowerCase();
         });
         return channel_conf;
     });
