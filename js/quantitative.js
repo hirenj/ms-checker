@@ -339,7 +339,8 @@ var check_quantified_peptides = function(db,peps) {
     var setup_config = get_channel_config(db).then(function(quant_config) {
         var channel_conf = {};
         if (quant_config.length != 2) {
-            if (peps.length > 0) {
+            var quant_peps = peps.filter(function(pep) { return pep.QuanResultID; });
+            if (quant_peps.length > 0) {
                 throw new Error("Incorrect number of quant channels");
             }
         }
