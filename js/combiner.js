@@ -227,7 +227,9 @@ var combine_all_peptides = function(peps) {
         var first_pep = peps[0];
         var quant = null;
         var high_sn = false;
+        var confident_singlet = false;
         var has_possible_mods = false;
+        var is_singlet = false;
         var hexnac_type = {};
         var hexnac_ratios = [];
         var max_score = null;
@@ -239,9 +241,17 @@ var combine_all_peptides = function(peps) {
             if ("CalculatedRatio" in pep) {
                 quant = pep.CalculatedRatio;
                 high_sn = true;
+                if (pep.CalculatedRatio == 1/100000 || pep.CalculatedRatio == 100000) {
+                    is_singlet = true;
+                }
+            } else {
+                is_singlet = true;
             }
             if ("has_low_sn" in pep && ! pep.has_low_sn) {
                 high_sn = true;
+            }
+            if ("has_high_sn" in pep && pep.has_high_sn) {
+                confident_singlet = true;
             }
             if ("has_pair" in pep && pep.has_pair === true && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
                 // Potential ratio 1/100000 in the potential_light
@@ -273,9 +283,14 @@ var combine_all_peptides = function(peps) {
         if (first_pep.uniprot.length > 1) {
             block.multi_protein = true;
         }
+
         if (quant !== null && high_sn) {
             block.quant = isNaN(parseInt(quant)) ? {'quant' : quant } : {'quant' : quant, 'mad' : first_pep.CalculatedRatio_mad };
+            if (is_singlet) {
+                block.quant.singlet_confidence = confident_singlet ? 'high' : 'low';
+            }
         }
+
         if (Object.keys(hexnac_type).length > 0) {
             block.hexnac_type = Object.keys(hexnac_type).sort();
             block.hexnac_ratio = hexnac_ratios.join(',');

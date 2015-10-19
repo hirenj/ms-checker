@@ -196,6 +196,7 @@ var check_potential_pair = function(db,pep,num_dimethyl,channel_conf) {
         }
         var sns = [];
         pep.has_low_sn = false;
+        pep.has_high_sn = false;
         var numeric_channel_id = channel_conf[pep.QuanChannelID.filter(onlyUnique)[0]];
 
         db.all(related_quants_sql,[ pep.QuanResultID, numeric_channel_id ]).then(function(events) {
@@ -206,6 +207,9 @@ var check_potential_pair = function(db,pep,num_dimethyl,channel_conf) {
 
                 events_length -= 1;
                 if (events_length <= 0) {
+                    if (Math.median(sns) >= 100 ) {
+                        pep.has_high_sn = true;
+                    }
                     if (Math.median(sns) < 10) {
                         pep.has_low_sn = true;
                     }

@@ -137,7 +137,7 @@ var calculate_glyco_composition = function(composition,mods) {
         }
         return count * mass;
     }).reduce(function(curr,next) { return curr+next; },0);
-}
+};
 
 var decide_spectrum = function(db,pep,spectrum) {
     var self = this;
