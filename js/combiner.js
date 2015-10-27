@@ -236,6 +236,7 @@ var combine_all_peptides = function(peps) {
 
         var spectra = [];
         var activations = [];
+        var areas = {'medium': [], 'light' : []};
 
         peps.forEach(function(pep) {
             if ("CalculatedRatio" in pep) {
@@ -272,6 +273,12 @@ var combine_all_peptides = function(peps) {
             }
             if ("possible_mods" in pep) {
                 has_possible_mods = true;
+            }
+            if (pep.areas && pep.areas['medium']) {
+                areas['medium'].push(pep.areas['medium']);
+            }
+            if (pep.areas && pep.areas['light']) {
+                areas['light'].push(pep.areas['light']);
             }
             spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan } );
             activations.push( pep.activation );
@@ -310,6 +317,7 @@ var combine_all_peptides = function(peps) {
 
         block.spectra = spectra;
         block.activation = activations.filter(onlyUnique);
+        block.quant_areas = areas;
 
         if (has_possible_mods) {
             block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) {
