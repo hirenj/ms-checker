@@ -3,10 +3,12 @@ var spectra = require('./spectrum');
 var quantitative = require('./quantitative');
 var peptide = require('./peptide');
 
-const MASS_H = 1.007825;
+const MASS_H = 1.007825035;
+const MASS_ELECTRON = 0.00054858026;
+const MASS_H_MINUS_ELECTRON = 1.007276455;
 const MASS_C = 12.000000;
-const MASS_N = 14.003070;
-const MASS_O = 15.994910;
+const MASS_N = 14.003074;
+const MASS_O = 15.99491463;
 
 const MASS_AMINO_ACIDS = {
     A:71.03712,
@@ -272,6 +274,16 @@ var sum_mods = function(array,idx) {
     return array.filter(function(mod) { return mod[0] === idx; }).map(function(mod) { return mod[2]; }).reduce(function(curr,next) { return curr + next; },0);
 };
 
+var calculate_peptide_masses = function(pep) {
+    var mods = quantitative.modifications_cache[pep.PeptideID] || [];
+    var masses = pep.Sequence.split('').map(function(aa,idx) { return MASS_AMINO_ACIDS[aa] + sum_mods(mods,idx+1);  });
+    return masses.concat(MASS_H_MINUS_ELECTRON + 2*MASS_H + MASS_O);
+};
+
+// We love Protein Prospector when trying to
+// figure out what the right masses should be
+// http://prospector.ucsf.edu/prospector/cgi-bin/mssearch.cgi
+
 var calculate_fragment_ions = function(pep,spectrum_charge) {
     var mods = quantitative.modifications_cache[pep.PeptideID] || [];
     var masses = pep.Sequence.split('').map(function(aa,idx) { return MASS_AMINO_ACIDS[aa] + sum_mods(mods,idx+1);  });
@@ -280,6 +292,8 @@ var calculate_fragment_ions = function(pep,spectrum_charge) {
     var b_ion_base, y_ion_base;
     while(charge > 0) {
         b_ion_base = 0;
+
+        // Should be minus electron here?
         y_ion_base = 2*MASS_H + MASS_O;
 
         for (var i = 0 ; i < pep.Sequence.length; i++) {
@@ -326,3 +340,6 @@ exports.validate_peptide_coverage = validate_peptide_coverage;
 exports.matched_ions = matched_ions;
 exports.theoretical_ions = theoretical_ions;
 exports.all_theoretical_ions = calculate_fragment_ions;
+exports.calculate_peptide_mass = calculate_peptide_masses;
+
+
