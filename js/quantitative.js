@@ -70,6 +70,14 @@ WHERE \
     WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \
         FROM AminoAcidModifications \
         WHERE ModificationName like "%Hex%") ) \
+    OR PeptideID in (SELECT PeptideID \
+        FROM \
+            FileInfos LEFT JOIN MassPeaks USING(FileID) \
+            LEFT JOIN SpectrumHeaders USING(MassPeakID) \
+            JOIN Peptides using(SpectrumID) \
+        WHERE FileInfos.Filename NOT LIKE "%raw" \
+            AND Peptides.ConfidenceLevel = 3 \
+            ) \
 UNION \
 \
 SELECT \
@@ -82,6 +90,14 @@ WHERE \
     WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \
         FROM AminoAcidModifications \
         WHERE ModificationName like "%Hex%") ) \
+    OR PeptideID in (SELECT PeptideID \
+        FROM \
+            FileInfos LEFT JOIN MassPeaks USING(FileID) \
+            LEFT JOIN SpectrumHeaders USING(MassPeakID) \
+            JOIN Peptides using(SpectrumID) \
+        WHERE FileInfos.Filename NOT LIKE "%raw" \
+            AND Peptides.ConfidenceLevel = 3 \
+            ) \
 ';
 
 const all_peptide_modifications_count_sql = 'SELECT \

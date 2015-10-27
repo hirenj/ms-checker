@@ -271,7 +271,7 @@ var combine_all_peptides = function(peps) {
                     hexnac_ratios.push((pep.galnac_intensity/pep.glcnac_intensity).toFixed(2));
                 }
             }
-            if ("possible_mods" in pep) {
+            if ("possible_mods" in pep && pep.activation !== 'HCD') {
                 has_possible_mods = true;
             }
             if (pep.areas && pep.areas['medium']) {
@@ -280,7 +280,7 @@ var combine_all_peptides = function(peps) {
             if (pep.areas && pep.areas['light']) {
                 areas['light'].push(pep.areas['light']);
             }
-            spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan } );
+            spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan, 'ppm' : pep.ppm } );
             activations.push( pep.activation );
         });
         var block = {

@@ -232,18 +232,24 @@ var get_spectrum = function(db,pep,processing_node,no_cache) {
         var charge = spectra[0].Charge;
         var mass = spectra[0].Mass;
         var scan = spectra[0].scan;
-        pep.retentionTime = spectra[0].rt;
-        pep.scan = spectra[0].scan;
+        var retentionTime = spectra[0].rt;
         return unzip_spectrum(spectrum).then(parse_spectrum).then(function(spectrum){
             spectrum.spectrumID = pep.SpectrumID;
             spectrum.charge = charge;
             spectrum.mass = mass;
             spectrum.scan = scan;
-            spectrum.rt = pep.retentionTime;
-            pep.activation = spectrum.activation;
+            spectrum.rt = retentionTime;
             return spectrum;
         });
     });
+
+    spectrum_caches[cache_id].then(function(spectrum) {
+        pep.retentionTime = spectrum.rt;
+        pep.scan = spectrum.scan;
+        pep.mass = spectrum.mass;
+        pep.activation = spectrum.activation;
+    });
+
     return spectrum_caches[cache_id];
 };
 
