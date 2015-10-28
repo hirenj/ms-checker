@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "byline": "^4.2.1",
+    "clone": "^1.0.2",
     "ftp": "^0.3.10",
     "nconf": "^0.7.1",
     "node-xlsx": "^0.5.1",

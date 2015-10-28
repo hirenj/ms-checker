@@ -156,6 +156,7 @@ var combine_all_peptides = function(peps) {
         var peps = grouped_peptides[pep_key].filter(not_hcd_filter);
         var quan_peps = peps.filter(function(pep) { return "QuanResultID" in pep;  });
         var singlet_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length < 2 && pep.has_pair == false; });
+        var paired_singlets = quan_peps.filter(function(pep) { return pep.QuanChannelID.length < 2 && pep.has_pair == true; });
         var ratioed_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length == 2; });
         var target_ratio = null;
         var target_ratio_mad = null;
@@ -191,6 +192,7 @@ var combine_all_peptides = function(peps) {
 
 
             singlet_peps.forEach(function(pep) { pep.used = false; });
+            paired_singlets.forEach(function(pep) { pep.used = false; });
             ratioed_peps.forEach(function(pep) { pep.used = true; });
 
         } else if (singlet_peps.length > 0)  {
@@ -198,10 +200,16 @@ var combine_all_peptides = function(peps) {
             target_ratio = singlet_peps[0].QuanChannelID[0] == "light" ? 1/100000 : 100000;
 
             var channel_ids = singlet_peps.map(function(pep) { return pep.QuanChannelID[0]; }).filter(onlyUnique);
-
+            singlet_peps.forEach(function(pep) {
+                pep.used = true;
+            });
             if (channel_ids.length > 1) {
                 target_ratio = 'conflicting_singlets';
             }
+        } else {
+            paired_singlets.forEach(function(pep) {
+                pep.used = true;
+            });
         }
         if (target_ratio) {
             quan_peps.forEach(function(pep) {
@@ -254,7 +262,7 @@ var combine_all_peptides = function(peps) {
             if ("has_high_sn" in pep && pep.has_high_sn) {
                 confident_singlet = true;
             }
-            if ("has_pair" in pep && pep.has_pair === true && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
+            if ("has_pair" in pep && pep.has_pair === true && pep.used && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
                 // Potential ratio 1/100000 in the potential_light
                 // Potential ratio 100000 in the potential_medium 
                 quant = pep.QuanChannelID[0] == "light" ? 'potential_light' : 'potential_medium';
@@ -276,9 +284,19 @@ var combine_all_peptides = function(peps) {
             }
             if (pep.areas && pep.areas['medium']) {
                 areas['medium'].push(pep.areas['medium']);
+                if ( ! pep.areas['light']) {
+                    areas['light'].push(0);
+                }
             }
             if (pep.areas && pep.areas['light']) {
                 areas['light'].push(pep.areas['light']);
+                if ( ! pep.areas['medium']) {
+                    areas['medium'].push(0);
+                }
+            }
+            if ( ! pep.areas || ! (pep.areas['light'] || pep.areas['medium']) ) {
+                areas['light'].push(0);
+                areas['medium'].push(0);
             }
             spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan, 'ppm' : pep.ppm } );
             activations.push( pep.activation );
