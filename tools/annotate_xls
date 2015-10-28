@@ -1,0 +1,125 @@
+#!/usr/bin/node
+
+var nconf = require('nconf');
+var XLSX = require('xlsx-style');
+var clone = require('clone');
+var fs = require('fs');
+
+
+nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
+
+var workbook = XLSX.readFile(nconf.get('input'));
+console.log("Read sheet in ");
+var sheet = nconf.get('sheet') - 1;
+var output = nconf.get('output');
+
+var first_sheet = workbook.SheetNames[sheet];
+var peptides_sheet = workbook.Sheets[first_sheet];
+new_sheet = clone(peptides_sheet);
+
+var get_msdata_file = function(path) {
+    return new Promise(function(resolve,reject) {
+        fs.readFile(path, 'utf8', function (err, data) {
+            if (err) throw err;
+            resolve(JSON.parse(data));
+        });
+    });
+};
+
+var sort_msdata_by_spectra = function(msdata) {
+    var results = {};
+    var data = msdata.data;
+    var uniprot;
+    for ( uniprot in data ) {
+        var peptides = data[uniprot];
+        peptides.forEach(function(pep) {
+            pep.spectra.map(function(spec) {
+                var key = [spec.rt.toFixed(2),spec.score.toFixed(2),spec.scan].join('#');
+                if ( ! results[key]) {
+                    results[key] = [];
+                }
+                pep.uniprot = uniprot;
+                results[key].push(pep);
+            });
+        });
+    }
+    return results;
+};
+
+get_msdata_file(nconf.get('msdata')).then(function(msdata) {
+    var by_spectrum = sort_msdata_by_spectra(msdata);
+    console.log("Got in here");
+    var rows = XLSX.utils.sheet_to_row_object_array(peptides_sheet, {'raw' : true });
+    console.log("Converted rows");
+    var annotations = rows.map(function(row) {
+        var scan_id = row['First Scan'] == row['Last Scan'] ? row['First Scan'] : row['First Scan']+';'+row['Last Scan']
+        var rowkey = [row['RT [min]'].toFixed(2),row['XCorr'].toFixed(2),scan_id].join('#');
+        var quant_value = row['Medium/Light'];
+        var related = by_spectrum[rowkey];
+        if (! related || related.length < 1) {
+            return "no-mapping";
+        }
+        if (related.length > 1) {
+            return "multi-peptide";
+        }
+        related = related[0];
+        if (related.sequence !== row['Sequence'].toUpperCase()) {
+            return "non-equal-sequence";
+        }
+        if ( quant_value ) {
+            var medium_areas = [].concat(related.quant_areas.medium);
+            var light_areas = [].concat(related.quant_areas.light);
+            var related_quants = medium_areas.map(function(medium) {
+                var light = light_areas.shift();
+                return (medium/light).toFixed(2);
+            });
+            if (related_quants.indexOf(quant_value.toFixed(2)) < 0) {
+                return "missing-quant";
+            }
+        } else {
+            var spec_idx = related.spectra.map(function(spec) { return spec.scan == scan_id; }).indexOf(true);
+            var self_channel = row['Quan Channel'].toLowerCase();
+            var other_channel = self_channel == 'medium' ? 'light' : 'medium';
+            if ( ! self_channel ) {
+                return "found-with-quant";
+            }
+            if ( related.quant_areas[ self_channel ][spec_idx] > 0 && related.quant_areas[ other_channel ][spec_idx] == 0 ) {
+                // We have a singlet that we found
+                if (related.quant && "mad" in related.quant) {
+                    return "redundant-singlet";
+                }
+                if ( ! related.quant ) {
+                    return "unquantified";
+                }
+                if (isNaN(related.quant.quant)) {
+                    return "paired-singlet";
+                }
+                if (related.quant.singlet_confidence == 'low') {
+                    return "used-low-confidence-singlet";
+                }
+                return "used-singlet";
+            } else {
+                return "missing-singlet";
+            }
+        }
+
+        return "used";
+    });
+    var col_num = Object.keys(rows[0]).length;
+    var max_range = 'A1';
+    annotations.forEach(function(annot,i) {
+        max_range = XLSX.utils.encode_col(col_num)+XLSX.utils.encode_row(i+1);
+        new_sheet[XLSX.utils.encode_cell({c:col_num,r:i+1})] = {v:annot,t:'s'};
+    });
+    new_sheet['!ref'] = 'A1:'+max_range;
+    console.log("Done rows");
+}).then(function() {
+    workbook.SheetNames.push('Validated');
+    workbook.Sheets['Validated'] = new_sheet;
+
+    XLSX.writeFile(workbook,nconf.get('output'));
+    console.log("Done");
+
+}).catch(function(err) {
+    console.error(err);
+});
