@@ -1,4 +1,5 @@
 var fs = require('fs');
+var contaminants = require('./contaminants');
 
 const fasta_files_sql = "SELECT FileName FROM FastaFiles";
 
@@ -83,6 +84,7 @@ var populate_metadata = function(db) {
     get_fasta_filenames(db,metadata),
     get_self_version(metadata),
     get_pd_metadata(db,metadata),
+    contaminants.get_version(metadata),
     get_score_metadata(db,metadata) ] ).then(function() {
         return metadata;
     });

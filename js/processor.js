@@ -21,6 +21,8 @@ var peptide = require('../js/peptide');
 
 var spectra = require('../js/spectrum');
 
+var contaminants = require('../js/contaminants');
+
 var ProgressBar = require('progress');
 
 ambiguous.conf = nconf;
@@ -248,7 +250,15 @@ var combine = function(blocks,sources) {
         });
         result.metadata.push(block.metadata);
     });
-    return result;
+    return contaminants.get_version({}).then(function() {
+      contaminants.identifiers.forEach(function(contaminant) {
+        if (contaminant in result.data) {
+          delete result.data[contaminant];
+        }
+      });
+      delete result.data[undefined];
+      return result;
+    });
 };
 
 module.exports = exports = { process: process_files, combine: combine, browse_file: browse_file };
