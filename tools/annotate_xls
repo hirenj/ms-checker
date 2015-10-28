@@ -8,6 +8,9 @@ var fs = require('fs');
 
 nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
 
+// Required: --input --output --sheet --msdata (.json)
+
+
 var workbook = XLSX.readFile(nconf.get('input'));
 console.log("Read sheet in "+nconf.get('input'));
 var sheet = nconf.get('sheet') - 1;
