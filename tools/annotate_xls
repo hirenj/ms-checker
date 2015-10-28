@@ -9,7 +9,7 @@ var fs = require('fs');
 nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
 
 var workbook = XLSX.readFile(nconf.get('input'));
-console.log("Read sheet in ");
+console.log("Read sheet in "+nconf.get('input'));
 var sheet = nconf.get('sheet') - 1;
 var output = nconf.get('output');
 
@@ -50,7 +50,6 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
     var by_spectrum = sort_msdata_by_spectra(msdata);
     console.log("Got in here");
     var rows = XLSX.utils.sheet_to_row_object_array(peptides_sheet, {'raw' : true });
-    console.log("Converted rows");
     var annotations = rows.map(function(row) {
         var scan_id = row['First Scan'] == row['Last Scan'] ? row['First Scan'] : row['First Scan']+';'+row['Last Scan']
         var rowkey = [row['RT [min]'].toFixed(2),row['XCorr'].toFixed(2),scan_id].join('#');
@@ -81,7 +80,31 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
             var self_channel = row['Quan Channel'].toLowerCase();
             var other_channel = self_channel == 'medium' ? 'light' : 'medium';
             if ( ! self_channel ) {
-                return "found-with-quant";
+                if (related.quant_areas[ 'medium' ][spec_idx] == 0 && related.quant_areas[ 'light' ][spec_idx] == 0) {
+                    if (related.quant) {
+                        return "not-quantified-but-merged";
+                    }
+                    return "not-quantified";
+                }
+                if (related.quant_areas[ 'medium' ][spec_idx] != 0 && related.quant_areas[ 'light' ][spec_idx] != 0) {
+                    return "found-as-with-ratio";
+                }
+                if (related.quant_areas[ 'medium' ][spec_idx] != 0 || related.quant_areas[ 'light' ][spec_idx] != 0) {
+                    return "found-as-singlet";
+                }
+                if (related.quant && "mad" in related.quant) {
+                    return "merged-with-quant-ratio";
+                }
+                if ( ! related.quant ) {
+                    return "merged-as-unquantified";
+                }
+                if (isNaN(related.quant.quant)) {
+                    return "merged-as-paired-singlet";
+                }
+                if (related.quant.singlet_confidence == 'low') {
+                    return "merged-as-low-confidence-singlet";
+                }
+                return "merged-as-singlet";
             }
             if ( related.quant_areas[ self_channel ][spec_idx] > 0 && related.quant_areas[ other_channel ][spec_idx] == 0 ) {
                 // We have a singlet that we found
@@ -89,7 +112,7 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
                     return "redundant-singlet";
                 }
                 if ( ! related.quant ) {
-                    return "unquantified";
+                    return "not-quantified-low-sn";
                 }
                 if (isNaN(related.quant.quant)) {
                     return "paired-singlet";
