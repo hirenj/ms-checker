@@ -49,9 +49,68 @@ var sort_msdata_by_spectra = function(msdata) {
     return results;
 };
 
+function sheet_from_array_of_arrays(data, opts) {
+    var ws = {};
+    var range = {s: {c:10000000, r:10000000}, e: {c:0, r:0 }};
+    for(var R = 0; R != data.length; ++R) {
+        for(var C = 0; C != data[R].length; ++C) {
+            if(range.s.r > R) range.s.r = R;
+            if(range.s.c > C) range.s.c = C;
+            if(range.e.r < R) range.e.r = R;
+            if(range.e.c < C) range.e.c = C;
+            var cell = {v: data[R][C] };
+            if(cell.v == null) continue;
+            var cell_ref = XLSX.utils.encode_cell({c:C,r:R});
+
+            if(typeof cell.v === 'number') cell.t = 'n';
+            else if(typeof cell.v === 'boolean') cell.t = 'b';
+            else if(cell.v instanceof Date) {
+                cell.t = 'n'; cell.z = XLSX.SSF._table[14];
+                cell.v = datenum(cell.v);
+            }
+            else cell.t = 's';
+
+            ws[cell_ref] = cell;
+        }
+    }
+    if(range.s.c < 10000000) ws['!ref'] = XLSX.utils.encode_range(range);
+    return ws;
+}
+
+var extract_rows_from_peptides = function(peptides) {
+    rowdata = peptides.map(function(peptide) {
+        return peptide.spectra.map(function(spec) {
+            return
+                [
+                    peptide.sequence,
+                    peptide.uniprot,
+                    (peptide.sites || []).map(function(site) { return site[1]+site[0]; }).join(','),
+                    peptide.composition.join(','),
+                    peptide.quant ? peptide.quant.quant : 'NA',
+                    spec.score,
+                    spec.ppm,
+                    spec.rt,
+                    spec.scan
+                ]
+            ;
+        });
+    });
+    return [].concat.apply([], rowdata);
+};
+
+var extract_new_rows = function(msdata) {
+    var data = msdata.data;
+    var results = [ [ 'sequence', 'uniprot', 'sites','composition','quant', 'XCorr', 'PPM', 'RT', 'Scan' ]];
+    for (uniprot in data ) {
+        var peptides = data[uniprot].filter(function(pep) { return ! pep.accounted; });
+        var rows = extract_rows_from_peptides(peptides);
+        results = results.concat(rows);
+    }
+    return results;
+};
+
 get_msdata_file(nconf.get('msdata')).then(function(msdata) {
     var by_spectrum = sort_msdata_by_spectra(msdata);
-    console.log("Got in here");
     var rows = XLSX.utils.sheet_to_row_object_array(peptides_sheet, {'raw' : true });
     var annotations = rows.map(function(row) {
         var scan_id = row['First Scan'] == row['Last Scan'] ? row['First Scan'] : row['First Scan']+';'+row['Last Scan']
@@ -61,6 +120,9 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
         if (! related || related.length < 1) {
             return "no-mapping";
         }
+        related.forEach(function(pep) {
+            pep.accounted = true;
+        });
         if (related.length > 1) {
             return "multi-peptide";
         }
@@ -138,14 +200,16 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
         new_sheet[XLSX.utils.encode_cell({c:col_num,r:i+1})] = {v:annot,t:'s'};
     });
     new_sheet['!ref'] = 'A1:'+max_range;
-    console.log("Done rows");
-}).then(function() {
+    return msdata;
+}).then(function(msdata) {
     workbook.SheetNames.push('Validated');
     workbook.Sheets['Validated'] = new_sheet;
-
+    return msdata;
+}).then(function(msdata){
+    workbook.SheetNames.push('New rows');
+    workbook.Sheets['New rows'] = extract_new_rows(msdata);
+}).then(function(){
     XLSX.writeFile(workbook,nconf.get('output'));
-    console.log("Done");
-
 }).catch(function(err) {
     console.error(err);
 });
