@@ -103,7 +103,7 @@ var extract_new_rows = function(msdata) {
     var data = msdata.data;
     var results = [ [ 'sequence', 'uniprot', 'sites','composition','quant', 'XCorr', 'PPM', 'RT', 'Scan' ]];
     for (uniprot in data ) {
-        var peptides = data[uniprot].filter(function(pep) { return ! pep.accounted; });
+        var peptides = data[uniprot].filter(function(pep) { return (pep.source == source) && ! pep.accounted; });
         var rows = extract_rows_from_peptides(peptides,uniprot);
         results = results.concat(rows);
     }
@@ -111,10 +111,18 @@ var extract_new_rows = function(msdata) {
 };
 
 get_msdata_file(nconf.get('msdata')).then(function(msdata) {
+    if (msdata.metadata[0]['msdata-version'] != '1.1') {
+        throw new Error("msdata format incompatible");
+    }
+    return msdata;
+}).then(function(msdata) {
     var by_spectrum = sort_msdata_by_spectra(msdata);
     var rows = XLSX.utils.sheet_to_row_object_array(peptides_sheet, {'raw' : true });
     var annotations = rows.map(function(row) {
-        var scan_id = row['First Scan'] == row['Last Scan'] ? row['First Scan'] : row['First Scan']+';'+row['Last Scan']
+        var scan_id = row['First Scan'] == row['Last Scan'] ? row['First Scan'] : row['First Scan']+';'+row['Last Scan'];
+        if ( ! row['RT [min]']) {
+            return "NA";
+        }
         var rowkey = [row['RT [min]'].toFixed(2),row['XCorr'].toFixed(2),scan_id].join('#');
         var quant_value = row['Medium/Light'];
         var related = by_spectrum[rowkey];
@@ -132,8 +140,9 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
             return "non-equal-sequence";
         }
         if ( quant_value ) {
-            var medium_areas = [].concat(related.quant_areas.medium);
-            var light_areas = [].concat(related.quant_areas.light);
+            var related_areas = related.quant_areas;
+            var medium_areas = [].concat(related_areas.medium);
+            var light_areas = [].concat(related_areas.light);
             var related_quants = medium_areas.map(function(medium) {
                 var light = light_areas.shift();
                 return (medium/light).toFixed(2);
@@ -146,7 +155,7 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
             var self_channel = row['Quan Channel'].toLowerCase();
             var other_channel = self_channel == 'medium' ? 'light' : 'medium';
             if ( ! self_channel ) {
-                if (related.quant_areas[ 'medium' ][spec_idx] == 0 && related.quant_areas[ 'light' ][spec_idx] == 0) {
+                if ( related.quant_areas[ 'medium' ][spec_idx] == 0 && related.quant_areas[ 'light' ][spec_idx] == 0) {
                     if (related.quant) {
                         return "not-quantified-but-merged";
                     }
@@ -172,6 +181,10 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
                 }
                 return "merged-as-singlet";
             }
+            if ( ! related.quant_areas ) {
+                return "missing-singlet";
+            }
+
             if ( related.quant_areas[ self_channel ][spec_idx] > 0 && related.quant_areas[ other_channel ][spec_idx] == 0 ) {
                 // We have a singlet that we found
                 if (related.quant && "mad" in related.quant) {

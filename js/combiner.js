@@ -245,7 +245,6 @@ var combine_all_peptides = function(peps) {
         var spectra = [];
         var activations = [];
         var areas = {'medium': [], 'light' : []};
-
         peps.forEach(function(pep) {
             if ("CalculatedRatio" in pep) {
                 quant = pep.CalculatedRatio;
