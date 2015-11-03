@@ -1,4 +1,5 @@
 var fs = require('fs');
+var contaminants = require('./contaminants');
 
 const fasta_files_sql = "SELECT FileName FROM FastaFiles";
 
@@ -8,7 +9,7 @@ const pd_metadata_sql = "SELECT SoftwareVersion, Date FROM SchemaInfo";
 
 const score_type_sql = 'SELECT ScoreID, ScoreName, Description FROM ProcessingNodeScores';
 
-const MSDATA_FORMAT_VERSION = "1";
+const MSDATA_FORMAT_VERSION = "1.1";
 
 var get_raw_filenames = function(db,metadata){
     var raw_filenames = [];
@@ -83,6 +84,7 @@ var populate_metadata = function(db) {
     get_fasta_filenames(db,metadata),
     get_self_version(metadata),
     get_pd_metadata(db,metadata),
+    contaminants.get_version(metadata),
     get_score_metadata(db,metadata) ] ).then(function() {
         return metadata;
     });
