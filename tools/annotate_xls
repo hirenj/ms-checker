@@ -8,18 +8,18 @@ var fs = require('fs');
 
 nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
 
-// Required: --input --output --sheet --msdata (.json)
+// Required: --input --source --output --sheet --msdata (.json)
 
 
 var workbook = XLSX.readFile(nconf.get('input'));
 console.log("Read sheet in "+nconf.get('input'));
 var sheet = nconf.get('sheet') - 1;
 var output = nconf.get('output');
+var source = nconf.get('source');
 
 var first_sheet = workbook.SheetNames[sheet];
 var peptides_sheet = workbook.Sheets[first_sheet];
 new_sheet = clone(peptides_sheet);
-
 var get_msdata_file = function(path) {
     return new Promise(function(resolve,reject) {
         fs.readFile(path, 'utf8', function (err, data) {
@@ -36,6 +36,9 @@ var sort_msdata_by_spectra = function(msdata) {
     for ( uniprot in data ) {
         var peptides = data[uniprot];
         peptides.forEach(function(pep) {
+            if ( source && pep.source !== source) {
+                return;
+            }
             pep.spectra.map(function(spec) {
                 var key = [spec.rt.toFixed(2),spec.score.toFixed(2),spec.scan].join('#');
                 if ( ! results[key]) {
@@ -77,22 +80,20 @@ function sheet_from_array_of_arrays(data, opts) {
     return ws;
 }
 
-var extract_rows_from_peptides = function(peptides) {
-    rowdata = peptides.map(function(peptide) {
+var extract_rows_from_peptides = function(peptides,uniprot) {
+    var rowdata = peptides.map(function(peptide) {
         return peptide.spectra.map(function(spec) {
-            return
-                [
+            return [
                     peptide.sequence,
-                    peptide.uniprot,
-                    (peptide.sites || []).map(function(site) { return site[1]+site[0]; }).join(','),
+                    uniprot || peptide.uniprot,
+                    (peptide.sites || []).map(function(site) { return site[1]+"@"+site[0]; }).join(','),
                     peptide.composition.join(','),
                     peptide.quant ? peptide.quant.quant : 'NA',
                     spec.score,
                     spec.ppm,
                     spec.rt,
                     spec.scan
-                ]
-            ;
+            ];
         });
     });
     return [].concat.apply([], rowdata);
@@ -103,10 +104,10 @@ var extract_new_rows = function(msdata) {
     var results = [ [ 'sequence', 'uniprot', 'sites','composition','quant', 'XCorr', 'PPM', 'RT', 'Scan' ]];
     for (uniprot in data ) {
         var peptides = data[uniprot].filter(function(pep) { return ! pep.accounted; });
-        var rows = extract_rows_from_peptides(peptides);
+        var rows = extract_rows_from_peptides(peptides,uniprot);
         results = results.concat(rows);
     }
-    return results;
+    return sheet_from_array_of_arrays(results);
 };
 
 get_msdata_file(nconf.get('msdata')).then(function(msdata) {
