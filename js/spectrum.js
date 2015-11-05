@@ -264,6 +264,13 @@ var get_related_spectra = function(db,spectrum) {
     });
 };
 
+var filter_hcd_with_mods = function(peps) {
+    peps = peps.filter(function(pep) {
+        return (pep.activation !== 'HCD' && pep.activation !== 'CID') || ! pep.modifications;
+    });
+    return peps;
+};
+
 var match_spectrum_data = function(db, scan, rt, charge, mass) {
     var wanted_scan = parseInt(scan);
     return db.do_statement(retrieve_related_spectra_by_data_sql,[rt - 0.03,rt + 0.03,charge,mass-0.01,mass+0.01]).then(function(spec_ids) {
@@ -278,9 +285,12 @@ var clear_caches = function() {
     spectrum_caches = {};
 };
 
+
+
 exports.init_spectrum_processing_num = init_spectrum_processing_num;
 exports.get_spectrum = get_spectrum;
 exports.get_related_spectra = get_related_spectra;
 exports.match_spectrum_data = match_spectrum_data;
 exports.clear_caches = clear_caches;
+exports.filter_hcd_with_mods = filter_hcd_with_mods;
 

@@ -186,7 +186,8 @@ var process_data = function(filename,sibling_files) {
           .then(peptide.produce_peptide_scores_and_cleanup.bind(peptide,db))
           .then(hexnac_hcd.guess_hexnac.bind(hexnac_hcd,db,sibling_files))
           .then(partial(fragmentation.validate_peptide_coverage,db))
-          .then(ppm.annotate_ppm);
+          .then(ppm.annotate_ppm)
+          .then(spectra.filter_hcd_with_mods);
 
         return processing_promise.then(function(peps) {
             return uniprot_meta.init().then(function() {

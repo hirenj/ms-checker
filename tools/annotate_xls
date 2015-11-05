@@ -97,7 +97,8 @@ var extract_rows_from_peptides = function(peptides,uniprot) {
                     spec.score,
                     spec.ppm,
                     spec.rt,
-                    spec.scan
+                    spec.scan,
+                    peptide.activation.join(',')
             ];
         });
     });
@@ -106,7 +107,7 @@ var extract_rows_from_peptides = function(peptides,uniprot) {
 
 var extract_new_rows = function(msdata) {
     var data = msdata.data;
-    var results = [ [ 'sequence', 'uniprot', 'sites','composition','quant', 'XCorr', 'PPM', 'RT', 'Scan' ]];
+    var results = [ [ 'sequence', 'uniprot', 'sites','composition','quant', 'XCorr', 'PPM', 'RT', 'Scan', 'Activation' ]];
     for (uniprot in data ) {
         var peptides = data[uniprot].filter(function(pep) { return (pep.source == source) && ! pep.accounted; });
         var rows = extract_rows_from_peptides(peptides,uniprot);
