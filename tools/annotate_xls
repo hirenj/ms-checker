@@ -40,7 +40,12 @@ var sort_msdata_by_spectra = function(msdata) {
                 return;
             }
             pep.spectra.map(function(spec) {
-                var key = [spec.rt.toFixed(2),spec.score.toFixed(2),spec.scan].join('#');
+                var scan_ids = spec.scan.split(';');
+                var scan = scan_ids.shift();
+                if (scan_ids.length > 0) {
+                    scan = scan + ';' + scan_ids.reverse().shift();
+                }
+                var key = [spec.rt.toFixed(2),spec.score.toFixed(2),scan].join('#');
                 if ( ! results[key]) {
                     results[key] = [];
                 }
