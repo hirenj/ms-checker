@@ -31,7 +31,10 @@ FROM FileInfos \
         ) AND \
             FileInfos.Filename NOT LIKE "%raw" \
     AND \
-        Peptides.ConfidenceLevel = 3';
+        Peptides.ConfidenceLevel = 3 \
+    AND \
+        Peptides.SearchEngineRank = 1 \
+';
 
 const retrieve_ambiguous_peptides_sql = 'SELECT \
     Peptides.PeptideID, Peptides.SpectrumID, Peptides.Sequence, SpectrumHeaders.ScanNumbers as scan, SpectrumHeaders.Mass as mass, SpectrumHeaders.RetentionTime as retentionTime, FileInfos.Filename \
@@ -40,7 +43,10 @@ FROM FileInfos \
     LEFT JOIN SpectrumHeaders USING(MassPeakID) \
     JOIN Peptides using(SpectrumID) \
     WHERE \
-        Peptides.ConfidenceLevel = 3';
+        Peptides.ConfidenceLevel = 3 \
+    AND \
+        Peptides.SearchEngineRank = 1 \
+';
 
 
 var clean_comp = function(comp) {

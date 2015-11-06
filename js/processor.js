@@ -167,6 +167,26 @@ var browse_file = function(filename) {
     });
 };
 
+var tracker_labels = {};
+
+var tracker = function(label) {
+  if (nconf.get('track-peptide-sequence')) {
+    return (function(peps) {
+      var filtered = peps.filter(function(pep) { return pep.Sequence == nconf.get('track-peptide-sequence'); });
+      if (filtered.length > 0) {
+//        console.log(filtered);
+      } else {
+        if ( ! tracker_labels[nconf.get('track-peptide-sequence')] ) {
+          console.log("\n\nWe lost tracked peptide "+nconf.get('track-peptide-sequence')+" at "+label+"\n\n");
+          tracker_labels[nconf.get('track-peptide-sequence')] = true;
+        }
+      }
+      return peps;
+    });
+  }
+  return function(peps) { return peps; }
+};
+
 var process_data = function(filename,sibling_files) {
     var global_datablock = {'data' : {}, 'metadata' : {}};
     return open_db(filename).then(function(db) {
@@ -174,20 +194,29 @@ var process_data = function(filename,sibling_files) {
         metadata.get_metadata(db).then(function(meta) {
             global_datablock.metadata = meta;
         });
+
         var quant_promise = quantitative.init_caches(db).then(function() {
              return quantitative.retrieve_quantified_peptides(db).then(partial(quantitative.check_quantified_peptides,db));
         });
         var ambig_promise = ambiguous.retrieve_peptides(db).then(function(peps) { return peps? peps : []; });
 
         var processing_promise = Promise.all([quant_promise,ambig_promise]).then(function(all_peps) {
+
             var merged = Array.prototype.concat.apply([], all_peps);
             return merged;
-        }).then(peptide.filter_ambiguous_spectra)
+        }).then(tracker('Read from DB'))
+          .then(peptide.filter_ambiguous_spectra)
+          .then(tracker('Ambiguous spectra'))
           .then(peptide.produce_peptide_scores_and_cleanup.bind(peptide,db))
+          .then(tracker('Scores'))
           .then(hexnac_hcd.guess_hexnac.bind(hexnac_hcd,db,sibling_files))
+          .then(tracker('HexNAc HCD'))
           .then(partial(fragmentation.validate_peptide_coverage,db))
+          .then(tracker('Fragmentation validation'))
           .then(ppm.annotate_ppm)
-          .then(spectra.filter_hcd_with_mods);
+          .then(tracker('PPM annotation'))
+          .then(spectra.filter_hcd_with_mods)
+          .then(tracker('HCD modification filtering'));
 
         return processing_promise.then(function(peps) {
             return uniprot_meta.init().then(function() {
