@@ -6,7 +6,8 @@
             return new Promise(function(resolve,reject) {
                 old_all.call(db,sql,vals,function(err,out_vals) {
                     if (err) {
-                        reject(err);
+                        console.error(err);
+                        throw err;
                     } else {
                         resolve(out_vals);
                     }
@@ -22,7 +23,8 @@
             return new Promise(function(resolve,reject) {
                 old_each.call(db,sql,vals,callback,function(err,vals) {
                     if (err) {
-                        reject(err);
+                        console.error(err);
+                        throw err;
                     } else {
                         resolve(vals);
                     }
@@ -39,7 +41,8 @@
             return new Promise(function(resolve,reject) {
                 cached_statements[sql].all.apply( cached_statements[sql], vals.concat( function(err,vals) {
                     if (err) {
-                        reject(err);
+                        console.error(err);
+                        throw err;
                     } else {
                         resolve(vals);
                     }
