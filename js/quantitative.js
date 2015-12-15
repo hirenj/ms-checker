@@ -118,12 +118,16 @@ const search_peptides_sql = 'SELECT \
     peptides.Sequence, \
     PrecursorIonQuanResultsSearchSpectra.QuanResultID, \
     PrecursorIonQuanResults.QuanChannelID, \
-    PrecursorIonQuanResults.Area \
+    PrecursorIonQuanResults.Area, \
+    customdata.FieldValue as acceptedquan \
 FROM peptides \
     LEFT JOIN PrecursorIonQuanResultsSearchSpectra \
         ON peptides.SpectrumID = PrecursorIonQuanResultsSearchSpectra.SearchSpectrumID \
     LEFT JOIN PrecursorIonQuanResults \
         ON PrecursorIonQuanResultsSearchSpectra.QuanResultID = PrecursorIonQuanResults.QuanResultID \
+    LEFT JOIN (SELECT * FROM CustomDataPeptides \
+                WHERE FieldID in (SELECT FieldID FROM CustomDataFields WHERE DisplayName = "QuanResultID")) as customdata \
+        ON peptides.PeptideID = customdata.PeptideID  \
 WHERE peptides.ConfidenceLevel = 3 \
 AND SearchEngineRank = 1 \
 AND peptides.PeptideID in (SELECT distinct PeptideID \
