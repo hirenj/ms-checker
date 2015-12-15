@@ -91,6 +91,9 @@ var mbars = new Multibar();
 
 [quantitative,ambiguous,hexnac_hcd,fragmentation,peptide].forEach(function(module) {
     module.on('task',function(desc) {
+        if ( !process.stdin.isTTY ) {
+          return;
+        }
         this.addListener('progress',function(percentage) {
             if ( ! progress_bars[module.constructor.name+desc] ) {
                 var barname = (module.constructor.name+" "+desc+(Array(50).join(' '))).substring(0,50);
@@ -184,6 +187,20 @@ var tracker = function(label) {
       return peps;
     });
   }
+  if (nconf.get('track-quanid')) {
+    return (function(peps) {
+      var filtered = peps.filter(function(pep) { return pep.QuanResultID == nconf.get('track-quanid'); });
+      if (filtered.length > 0) {
+//        console.log(filtered);
+      } else {
+        if ( ! tracker_labels[nconf.get('track-quanid')] ) {
+          console.log("\n\nWe lost tracked peptide "+nconf.get('track-quanid')+" at "+label+"\n\n");
+          tracker_labels[nconf.get('track-quanid')] = true;
+        }
+      }
+      return peps;
+    });
+  }
   return function(peps) { return peps; }
 };
 
@@ -196,7 +213,7 @@ var process_data = function(filename,sibling_files) {
         });
 
         var quant_promise = quantitative.init_caches(db).then(function() {
-             return quantitative.retrieve_quantified_peptides(db).then(partial(quantitative.check_quantified_peptides,db));
+             return quantitative.retrieve_quantified_peptides(db).then(tracker('Retrieve quantified peptides')).then(partial(quantitative.check_quantified_peptides,db)).then(tracker('Check quantified peptides'));
         });
         var ambig_promise = ambiguous.retrieve_peptides(db).then(function(peps) { return peps? peps : []; });
 
@@ -206,7 +223,7 @@ var process_data = function(filename,sibling_files) {
             return merged;
         }).then(tracker('Read from DB'))
           .then(peptide.filter_ambiguous_spectra)
-          .then(tracker('Ambiguous spectra'))
+          .then(tracker('Filter ambiguous spectra'))
           .then(peptide.produce_peptide_scores_and_cleanup.bind(peptide,db))
           .then(tracker('Scores'))
           .then(hexnac_hcd.guess_hexnac.bind(hexnac_hcd,db,sibling_files))
@@ -218,7 +235,9 @@ var process_data = function(filename,sibling_files) {
           .then(spectra.filter_hcd_with_mods)
           .then(tracker('HCD modification filtering'));
 
+
         return processing_promise.then(function(peps) {
+            tracker('Finished tracking, did not lose')([]);
             return uniprot_meta.init().then(function() {
                 global_datablock.data = peptide.combine(peps);
                 quantitative.clear_caches();
