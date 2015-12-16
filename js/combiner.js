@@ -154,7 +154,7 @@ var combine_all_peptides = function(peps) {
         // HCD identification is not used for quantification
 
         var peps = grouped_peptides[pep_key].filter(not_hcd_filter);
-        var quan_peps = peps.filter(function(pep) { return "QuanResultID" in pep;  });
+        var quan_peps = peps.filter(function(pep) { return pep.acceptedquant && "QuanResultID" in pep;  });
         var singlet_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length < 2 && pep.has_pair == false; });
         var paired_singlets = quan_peps.filter(function(pep) { return pep.QuanChannelID.length < 2 && pep.has_pair == true; });
         var ratioed_peps = quan_peps.filter(function(pep) { return pep.QuanChannelID.length == 2; });
@@ -219,6 +219,21 @@ var combine_all_peptides = function(peps) {
                 pep.CalculatedRatio = target_ratio;
             });
         }
+
+        peps.filter(function(pep) { return (! pep.acceptedquant) && "QuanResultID" in pep;  }).forEach(function(pep) {
+            // For peptides that aren't accepted as being quantitated by Proteome Discoverer
+            // we should only report them if they don't exist in a group along side
+            // any other peptides that have a ratio.
+            if (! target_ratio) {
+                if (pep.QuanChannelID.length > 1) {
+                    pep.unaccepted_quant = "ratio";//pep.areas["medium"] / pep.areas["light"];
+                } else if (pep.QuanChannelID.length == 1) {
+                    pep.unaccepted_quant = "singlet_"+pep.QuanChannelID[0];
+                }
+            }
+        });
+
+
     });
 
     peps.forEach(function(pep) {
@@ -241,19 +256,23 @@ var combine_all_peptides = function(peps) {
         var hexnac_type = {};
         var hexnac_ratios = [];
         var max_score = null;
+        var unaccepted_quant = null;
+
 
         var spectra = [];
         var activations = [];
         var areas = {'medium': [], 'light' : []};
         peps.forEach(function(pep) {
-            if ("CalculatedRatio" in pep) {
-                quant = pep.CalculatedRatio;
-                high_sn = true;
-                if (pep.CalculatedRatio == 1/100000 || pep.CalculatedRatio == 100000) {
+            if (pep.acceptedquant) {
+                if ("CalculatedRatio" in pep) {
+                    quant = pep.CalculatedRatio;
+                    high_sn = true;
+                    if (pep.CalculatedRatio == 1/100000 || pep.CalculatedRatio == 100000) {
+                        is_singlet = true;
+                    }
+                } else {
                     is_singlet = true;
                 }
-            } else {
-                is_singlet = true;
             }
             if ("has_low_sn" in pep && ! pep.has_low_sn) {
                 high_sn = true;
@@ -261,11 +280,16 @@ var combine_all_peptides = function(peps) {
             if ("has_high_sn" in pep && pep.has_high_sn) {
                 confident_singlet = true;
             }
-            if ("has_pair" in pep && pep.has_pair === true && pep.used && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
+            if (pep.acceptedquant && "has_pair" in pep && pep.has_pair === true && pep.used && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
                 // Potential ratio 1/100000 in the potential_light
                 // Potential ratio 100000 in the potential_medium 
                 quant = pep.QuanChannelID[0] == "light" ? 'potential_light' : 'potential_medium';
             }
+
+            if ( ! pep.acceptedquant ) {
+                unaccepted_quant = pep.unaccepted_quant;
+            }
+
             if ("hexnac_type" in pep) {
                 hexnac_type[pep.hexnac_type] = true;
                 if (("GlcNAc" in hexnac_type || "GalNAc" in hexnac_type)) {
@@ -281,13 +305,13 @@ var combine_all_peptides = function(peps) {
             if ("possible_mods" in pep && pep.activation !== 'HCD') {
                 has_possible_mods = true;
             }
-            if (pep.areas && pep.areas['medium']) {
+            if (pep.areas && pep.acceptedquant && pep.areas['medium']) {
                 areas['medium'].push(pep.areas['medium']);
                 if ( ! pep.areas['light']) {
                     areas['light'].push(0);
                 }
             }
-            if (pep.areas && pep.areas['light']) {
+            if (pep.areas && pep.acceptedquant && pep.areas['light']) {
                 areas['light'].push(pep.areas['light']);
                 if ( ! pep.areas['medium']) {
                     areas['medium'].push(0);
@@ -300,6 +324,17 @@ var combine_all_peptides = function(peps) {
             spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan, 'ppm' : pep.ppm } );
             activations.push( pep.activation );
         });
+
+        // If we have a ratio / singlet and an unaccepted quant
+        // we should just accept the quant, and ignore the unaccepted quant info
+        // There is the possibility of checking to make sure that the rejected
+        // singlet goes in the same direction as the other quants, but
+        // I think the logic of that is a bit iffy.
+
+        if (quant && unaccepted_quant) {
+            unaccepted_quant = null;
+        }
+
         var block = {
             'multi_protein' : false,
             'sequence' : first_pep.Sequence
@@ -314,7 +349,9 @@ var combine_all_peptides = function(peps) {
                 block.quant.singlet_confidence = confident_singlet ? 'high' : 'low';
             }
         }
-
+        if (unaccepted_quant) {
+            block.quant = {'quant' : "rejected_"+unaccepted_quant };
+        }
         if (Object.keys(hexnac_type).length > 0) {
             block.hexnac_type = Object.keys(hexnac_type).sort();
             block.hexnac_ratio = hexnac_ratios.join(',');

@@ -119,14 +119,14 @@ const search_peptides_sql = 'SELECT \
     PrecursorIonQuanResultsSearchSpectra.QuanResultID, \
     PrecursorIonQuanResults.QuanChannelID, \
     PrecursorIonQuanResults.Area, \
-    customdata.FieldValue as acceptedquan \
+    ifnull(customdata.quantcount,0) as acceptedquant \
 FROM peptides \
     LEFT JOIN PrecursorIonQuanResultsSearchSpectra \
         ON peptides.SpectrumID = PrecursorIonQuanResultsSearchSpectra.SearchSpectrumID \
     LEFT JOIN PrecursorIonQuanResults \
         ON PrecursorIonQuanResultsSearchSpectra.QuanResultID = PrecursorIonQuanResults.QuanResultID \
-    LEFT JOIN (SELECT * FROM CustomDataPeptides \
-                WHERE FieldID in (SELECT FieldID FROM CustomDataFields WHERE DisplayName = "QuanResultID")) as customdata \
+    LEFT JOIN (SELECT PeptideID, count(FieldID) as quantcount FROM CustomDataPeptides \
+                WHERE FieldID in (SELECT FieldID FROM CustomDataFields WHERE DisplayName = "QuanResultID") GROUP BY PeptideID) as customdata \
         ON peptides.PeptideID = customdata.PeptideID  \
 WHERE peptides.ConfidenceLevel = 3 \
 AND SearchEngineRank = 1 \
@@ -341,6 +341,7 @@ var retrieve_quantified_peptides = function(db) {
     return db.each(search_peptides_sql,[],function(err,pep) {
         idx += 1;
         if (pep) {
+            pep.acceptedquant = (pep.acceptedquant == 0) ? false : true;
             peps.push(pep);
         }
         exports.notify_progress(idx,total_count);
