@@ -305,6 +305,10 @@ var combine_all_peptides = function(peps) {
             if ("possible_mods" in pep && pep.activation !== 'HCD') {
                 has_possible_mods = true;
             }
+
+            // The areas arrays should only contain the areas for the
+            // quantitations that have been accepted.
+
             if (pep.areas && pep.acceptedquant && pep.areas['medium']) {
                 areas['medium'].push(pep.areas['medium']);
                 if ( ! pep.areas['light']) {
@@ -317,10 +321,11 @@ var combine_all_peptides = function(peps) {
                     areas['medium'].push(0);
                 }
             }
-            if ( ! pep.areas || ! (pep.areas['light'] || pep.areas['medium']) ) {
+            if ( ! pep.areas || ! (pep.areas['light'] || pep.areas['medium']) || ! pep.acceptedquant ) {
                 areas['light'].push(0);
                 areas['medium'].push(0);
             }
+
             spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan, 'ppm' : pep.ppm } );
             activations.push( pep.activation );
         });

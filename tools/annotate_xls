@@ -146,6 +146,12 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
             return "non-equal-sequence";
         }
         if ( quant_value ) {
+
+            // If there is a quant value in the
+            // output from the Proteome discoverer sheet
+            // we need to check that it is part of our
+            // output.
+
             var related_areas = related.quant_areas;
             var medium_areas = [].concat(related_areas.medium);
             var light_areas = [].concat(related_areas.light);
@@ -153,19 +159,35 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
                 var light = light_areas.shift();
                 return (medium/light).toFixed(2);
             });
+
+            // If we don't see this quant ratio in any of our ratios
+            // we have a missing quantitation value
+
             if (related_quants.indexOf(quant_value.toFixed(2)) < 0) {
                 return "missing-quant";
             }
+
+            // Otherwise this row should be ok.
+
         } else {
             var spec_idx = related.spectra.map(function(spec) { return spec.scan == scan_id; }).indexOf(true);
             var self_channel = row['Quan Channel'].toLowerCase();
             var other_channel = self_channel == 'medium' ? 'light' : 'medium';
+
+            // If Proteome discoverer has not assigned a channel to
+            // this row, we have an non-quantified value
+            // This non-quantified value can either be used as a non-quantified, or
+            // used as a rejected quantification, or used as part of a merged peptide.
+
             if ( ! self_channel ) {
                 if ( related.quant_areas[ 'medium' ][spec_idx] == 0 && related.quant_areas[ 'light' ][spec_idx] == 0) {
                     if (related.quant) {
-                        return "not-quantified-but-merged";
+                        if ((related.quant.quant+"").match('rejected')) {
+                            return "used-rejected-quant";
+                        }
+                        return "used-merged-with-quantified";
                     }
-                    return "not-quantified";
+                    return "used-not-quantified";
                 }
                 if (related.quant_areas[ 'medium' ][spec_idx] != 0 && related.quant_areas[ 'light' ][spec_idx] != 0) {
                     return "found-as-with-ratio";
@@ -174,33 +196,39 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
                     return "found-as-singlet";
                 }
                 if (related.quant && "mad" in related.quant) {
-                    return "merged-with-quant-ratio";
+                    return "used-merged-with-quant-ratio";
                 }
                 if ( ! related.quant ) {
-                    return "merged-as-unquantified";
+                    return "used-merged-with-unquantified";
                 }
                 if (isNaN(related.quant.quant)) {
-                    return "merged-as-paired-singlet";
+                    return "used-merged-as-paired-singlet";
                 }
                 if (related.quant.singlet_confidence == 'low') {
-                    return "merged-as-low-confidence-singlet";
+                    return "used-merged-as-low-confidence-singlet";
                 }
-                return "merged-as-singlet";
+                return "used-merged-as-singlet";
             }
+
+            // If we have a self_channel, but no quant ratio column, it's a singlet.
+
+            // If we don't have a related quant area, then it's a plain asnd simple missing singlet value
+
             if ( ! related.quant_areas ) {
                 return "missing-singlet";
             }
 
             if ( related.quant_areas[ self_channel ][spec_idx] > 0 && related.quant_areas[ other_channel ][spec_idx] == 0 ) {
+
                 // We have a singlet that we found
                 if (related.quant && "mad" in related.quant) {
-                    return "redundant-singlet";
+                    return "used-merged-and-ignored-with-quant-ratio";
                 }
                 if ( ! related.quant ) {
-                    return "not-quantified-low-sn";
+                    return "used-not-quantified-low-sn";
                 }
                 if (isNaN(related.quant.quant)) {
-                    return "paired-singlet";
+                    return "used-marked-as-paired-singlet";
                 }
                 if (related.quant.singlet_confidence == 'low') {
                     return "used-low-confidence-singlet";
@@ -210,7 +238,9 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
                 return "missing-singlet";
             }
         }
-
+        if (related.quant && "mad" in related.quant) {
+            return "used-merged";
+        }
         return "used";
     });
     var col_num = Object.keys(rows[0]).length;
