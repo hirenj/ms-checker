@@ -27,6 +27,7 @@ const related_quants_sql = 'SELECT \
     LeftRT, \
     RightRT, \
     SN, \
+    Intensity, \
     QuanChannelID, \
     Charge \
 FROM EventAnnotations \
@@ -215,6 +216,7 @@ var check_potential_pair = function(db,pep,num_dimethyl,channel_conf) {
             mass_change_dir = -1;
         }
         var sns = [];
+        var intensities = [];
         pep.has_low_sn = false;
         pep.has_high_sn = false;
         var numeric_channel_id = channel_conf[pep.QuanChannelID.filter(onlyUnique)[0]];
@@ -224,9 +226,13 @@ var check_potential_pair = function(db,pep,num_dimethyl,channel_conf) {
             events.forEach(function(ev) {
 
                 sns.push(ev.SN);
+                intensities.push(ev.Intensity);
 
                 events_length -= 1;
                 if (events_length <= 0) {
+
+                    pep.quant_intensity_range = [ Math.min.apply(null,intensities), Math.max.apply(null,intensities) ];
+
                     if (Math.median(sns) >= 100 ) {
                         pep.has_high_sn = true;
                     }

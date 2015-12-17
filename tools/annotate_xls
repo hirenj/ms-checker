@@ -45,6 +45,7 @@ var sort_msdata_by_spectra = function(msdata) {
                 if (scan_ids.length > 0) {
                     scan = scan + ';' + scan_ids.reverse().shift();
                 }
+                spec.short_scan = scan;
                 var key = [spec.rt.toFixed(2),spec.score.toFixed(2),scan].join('#');
                 if ( ! results[key]) {
                     results[key] = [];
@@ -170,7 +171,7 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
             // Otherwise this row should be ok.
 
         } else {
-            var spec_idx = related.spectra.map(function(spec) { return spec.scan == scan_id; }).indexOf(true);
+            var spec_idx = related.spectra.map(function(spec) { return spec.short_scan == scan_id; }).indexOf(true);
             var self_channel = row['Quan Channel'].toLowerCase();
             var other_channel = self_channel == 'medium' ? 'light' : 'medium';
 
@@ -189,10 +190,10 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
                     }
                     return "used-not-quantified";
                 }
-                if (related.quant_areas[ 'medium' ][spec_idx] != 0 && related.quant_areas[ 'light' ][spec_idx] != 0) {
+                if (related.quant_areas[ 'medium' ][spec_idx] !== 0 && related.quant_areas[ 'light' ][spec_idx] !== 0) {
                     return "found-as-with-ratio";
                 }
-                if (related.quant_areas[ 'medium' ][spec_idx] != 0 || related.quant_areas[ 'light' ][spec_idx] != 0) {
+                if (related.quant_areas[ 'medium' ][spec_idx] !== 0 || related.quant_areas[ 'light' ][spec_idx] !== 0) {
                     return "found-as-singlet";
                 }
                 if (related.quant && "mad" in related.quant) {
@@ -225,6 +226,7 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
                     return "used-merged-and-ignored-with-quant-ratio";
                 }
                 if ( ! related.quant ) {
+                    throw new Error("We should not have quant areas without a quant");
                     return "used-not-quantified-low-sn";
                 }
                 if (isNaN(related.quant.quant)) {
@@ -232,6 +234,9 @@ get_msdata_file(nconf.get('msdata')).then(function(msdata) {
                 }
                 if (related.quant.singlet_confidence == 'low') {
                     return "used-low-confidence-singlet";
+                }
+                if (related.quant.singlet_confidence == 'low_sn') {
+                    return "used-low-sn-singlet";
                 }
                 return "used-singlet";
             } else {

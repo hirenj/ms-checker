@@ -262,6 +262,7 @@ var combine_all_peptides = function(peps) {
         var spectra = [];
         var activations = [];
         var areas = {'medium': [], 'light' : []};
+        var quant_intensity = {'min' : null, 'max' : null};
         peps.forEach(function(pep) {
             if (pep.acceptedquant) {
                 if ("CalculatedRatio" in pep) {
@@ -325,7 +326,14 @@ var combine_all_peptides = function(peps) {
                 areas['light'].push(0);
                 areas['medium'].push(0);
             }
-
+            if (pep.quant_intensity_range) {
+                if (quant_intensity.min === null || pep.quant_intensity_range.min < quant_intensity[0]) {
+                    quant_intensity.min = pep.quant_intensity_range[0];
+                }
+                if (quant_intensity.max === null || pep.quant_intensity_range.max > quant_intensity[1]) {
+                    quant_intensity.max = pep.quant_intensity_range[1];
+                }
+            }
             spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan, 'ppm' : pep.ppm } );
             activations.push( pep.activation );
         });
@@ -348,10 +356,14 @@ var combine_all_peptides = function(peps) {
             block.multi_protein = true;
         }
 
-        if (quant !== null && high_sn) {
+        if (quant !== null) {
             block.quant = isNaN(parseInt(quant)) ? {'quant' : quant } : {'quant' : quant, 'mad' : first_pep.CalculatedRatio_mad };
             if (is_singlet) {
                 block.quant.singlet_confidence = confident_singlet ? 'high' : 'low';
+                if ( ! high_sn ) {
+                    block.quant.singlet_confidence = 'low_sn';
+                }
+                block.quant.intensities = quant_intensity;
             }
         }
         if (unaccepted_quant) {
