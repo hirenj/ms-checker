@@ -269,7 +269,7 @@ var combine_all_peptides = function(peps) {
         var hexnac_ratios = [];
         var max_score = null;
         var unaccepted_quant = null;
-
+        var has_corex = false;
 
         var spectra = [];
         var activations = [];
@@ -315,6 +315,11 @@ var combine_all_peptides = function(peps) {
                     hexnac_ratios.push((pep.galnac_intensity/pep.glcnac_intensity).toFixed(2));
                 }
             }
+
+            if ("corex" in pep) {
+                has_corex = true;
+            }
+
             if ("possible_mods" in pep && pep.activation !== 'HCD') {
                 has_possible_mods = true;
             }
@@ -410,6 +415,10 @@ var combine_all_peptides = function(peps) {
         block.spectra = spectra;
         block.activation = activations.filter(onlyUnique);
         block.quant_areas = areas;
+
+        if (has_corex) {
+            block.has_corex = has_corex;
+        }
 
         if (has_possible_mods) {
             block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) {

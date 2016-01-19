@@ -74,6 +74,11 @@ var is_glcnac_mass = function(mz,error) {
     return (check_mass(glcnac_126,mz,error) || check_mass(glcnac_144,mz,error) );
 };
 
+var is_core2_mass = function(mz,error) {
+    return (check_mass(MASS_H+(mod_masses['HexNAc']*2),mz,error));
+};
+
+
 var accept_mass = function(masses,intensities,mass,intensity) {
     var i = 0;
     var inserted = false;
@@ -147,6 +152,8 @@ const mod_masses = {
     'HexHex' : 324.105646,
     'Deamidated:O' : -1
 };
+
+const MASS_H = 1.007825035;
 
 var calculate_glyco_composition = function(composition,mods) {
     return composition.map(function(comp) {
@@ -223,9 +230,14 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
     // Check to see what the ratio (mz-138 + mz-168) / (mz-126 + mz-144) is
     // if it is within 0.4 - 0.6, it is a GalNAc, 2.0 or greater, GlcNAc
 
+    var is_core2 = false;
+
     spectrum.peaks.forEach(function(peak) {
         var mass = peak.mass;
         var intensity = peak.intensity;
+        if ( is_core2_mass(mass,{'ppm' : 10 }) ) {
+            is_core2 = true;
+        }
         if ( is_glcnac_mass(mass,error) ) {
             accept_mass( glcnac_masses, glcnac_intensities , mass, intensity);
         } else if ( is_galnac_mass(mass,error) ) {
@@ -251,6 +263,9 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
             pep.hexnac_type = hexnac_type;
         } else if (pep.hexnac_type && pep.hexnac_type != hexnac_type ) {
             console.log("Conflicting HexNAc types ", pep.hexnac_type,hexnac_type);
+        }
+        if (is_core2) {
+            pep.corex = true;
         }
     } else {
         pep.galnac_intensity = 0;

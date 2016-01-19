@@ -14,6 +14,7 @@ var write_excel_file = function(datablock,filename) {
                     "quant_max_intensity",
                     "hexnac_type",
                     "hexnac_ratio",
+                    "has_corex",
                     "sequence",
                     "peptide_start",
                     "peptide_end",
@@ -72,6 +73,13 @@ var write_excel_file = function(datablock,filename) {
                 data.push(null);
                 data.push(null);
             }
+
+            if (pep.has_corex) {
+                data.push(pep.has_corex);
+            } else {
+                data.push(null);
+            }
+
             data.push(pep.sequence);
             data.push(pep.peptide_start);
             data.push(pep.peptide_start + pep.sequence.length - 1);
