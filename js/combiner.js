@@ -58,7 +58,7 @@ var check_single_site = function(pep) {
         return;
     }
     var total_sites = pep.Composition.map(function(comp) {  return parseInt(comp.split('x')[0]); }).reduce(function(old,n) { return old + n; },0);
-    if (indices.length == total_sites && ! pep.modifications) {
+    if (indices.length == 1 && indices.length == total_sites && ! pep.modifications) {
         pep.modifications = indices.map(function(idx) {  return [ idx, pep.Composition[0].slice(2) ] ; });
         pep.made_ambiguous = 'inferred';
     }
@@ -429,7 +429,16 @@ var combine_all_peptides = function(peps) {
             }).filter(onlyUnique);
             block.made_ambiguous = '';
 
-            var ambig_reasons = peps.filter(function(pep) { return "made_ambiguous" in pep; }).map(function(pep) { return pep.made_ambiguous == true ? 'missing_site_coverage' : pep.made_ambiguous; });
+            var ambig_reasons = peps.filter(function(pep) { return "made_ambiguous" in pep; }).map(function(pep) {
+                if (pep.made_ambiguous == true) {
+                    if (! pep.is_etd_precise) {
+                        return 'missing_exact_etd_site_coverage';
+                    }
+                    return 'missing_site_coverage';
+                }
+                return pep.made_ambiguous;
+            });
+
             if (ambig_reasons.length > 0) {
                 block.made_ambiguous = ambig_reasons.sort().filter(onlyUnique).join(',');
             }

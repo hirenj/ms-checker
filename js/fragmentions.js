@@ -201,23 +201,41 @@ var resolve_modifications = function(pep,aa_re) {
     });
 
     var is_ambiguous = false;
+    var is_etd_precise = true;
     Object.keys(groups).forEach(function(aagroup) {
         var seq = aagroup.split('-')[1];
         var start_pos = parseInt(aagroup.split('-')[0]);
         var start = null;
         var end;
         var match;
-        if ( ! seq.match(aa_re) ) {
-            made_ambiguous = true;
-            pep.invalid_modification = true;
-            groups[aagroup].forEach(function(mod) {
-                mod[3] = 0;
-                mod[4] = 0;
-            });
-            return pep;
-        }
-        if ( seq.match(aa_re).length > groups[aagroup].length ) {
+
+        var group_ambiguous = false;
+
+        match = seq.match(aa_re);
+
+        // If the minimal sequence around the site
+        // contains more than one possible site
+        // we should mark this as an imprecise site
+        // of sorts, and claim that the peptide is
+        // in fact ambiguous
+
+        if ( match.length  > 1 && groups[aagroup].length > 1 ) {
+            is_etd_precise = false;
+            group_ambiguous = true;
             is_ambiguous = true;
+        }
+
+        // If there are more possible sites than
+        // there are actual modifications for the
+        // given minimal sequence around a site,
+        // we should mark the sites as ambiguous.
+
+        if ( match.length > groups[aagroup].length ) {
+            is_ambiguous = true;
+            group_ambiguous = true;
+        }
+
+        if (group_ambiguous) {
             while ( match = aa_re.exec(seq) ) {
                 if ( start === null ) {
                     start = start_pos + match.index;
@@ -238,6 +256,7 @@ var resolve_modifications = function(pep,aa_re) {
         pep.possible_mods = pep.modifications;
         delete pep.modifications;
         pep.made_ambiguous = true;
+        pep.is_etd_precise = is_etd_precise;
     }
     return pep;
 };
