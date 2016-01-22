@@ -120,8 +120,8 @@ var assign_peptide_ions = function(db,pep,debug) {
             return ! ion_filters(ion.type);
         });
         theoretical_ions.forEach(function(ion) {
-            var min_mz = ion.mz - 0.02;
-            var max_mz = ion.mz + 0.02;
+            var min_mz = ion.mz - 0.01;
+            var max_mz = ion.mz + 0.01;
             var matching_peaks = spectrum.peaks.filter(function(peak) {  return peak.mass <= max_mz && peak.mass >= min_mz;   });
             ion.peaks = matching_peaks;
         });
@@ -320,17 +320,17 @@ var calculate_fragment_ions = function(pep,spectrum_charge) {
             { 'type' : 'c_-3_'+(i+1), 'mz' : (b_ion_base + MASS_N + 3 * MASS_H - 3*MASS_H + charge * MASS_H) / charge, 'z' : charge },
 
 
-            { 'type' : 'y'+(i+1), 'mz' : (y_ion_base + charge * MASS_H) / charge, 'z' : charge },
-            { 'type' : 'y_nh3_'+(i+1), 'mz' : (y_ion_base - MASS_N - 3 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
-            { 'type' : 'y_h2o_'+(i+1), 'mz' : (y_ion_base - 2* MASS_H - MASS_O + charge * MASS_H) / charge, 'z' : charge },
-            { 'type' : 'x'+(i+1), 'mz' : (y_ion_base + MASS_C + MASS_O - 2 * MASS_H + charge * MASS_H) / charge, 'z' : charge },
-            { 'type' : 'z'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H + charge * MASS_H) / charge)-MASS_ELECTRON, 'z' : charge },
-            { 'type' : 'z_+1_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H + MASS_H + charge * MASS_H) / charge)-MASS_ELECTRON, 'z' : charge },
-            { 'type' : 'z_-1_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H - MASS_H + charge * MASS_H) / charge)-MASS_ELECTRON, 'z' : charge },
-            { 'type' : 'z_+2_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H + 2*MASS_H + charge * MASS_H) / charge)-MASS_ELECTRON, 'z' : charge },
-            { 'type' : 'z_-2_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H - 2*MASS_H + charge * MASS_H) / charge)-MASS_ELECTRON, 'z' : charge },
-            { 'type' : 'z_+3_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H + 3*MASS_H + charge * MASS_H) / charge)-MASS_ELECTRON, 'z' : charge },
-            { 'type' : 'z_-3_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H - 3*MASS_H + charge * MASS_H) / charge)-MASS_ELECTRON, 'z' : charge }
+            { 'type' : 'y'+(i+1), 'mz' : ((y_ion_base + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'y_nh3_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 3 * MASS_H + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'y_h2o_'+(i+1), 'mz' : ((y_ion_base - 2* MASS_H - MASS_O + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'x'+(i+1), 'mz' : ((y_ion_base + MASS_C + MASS_O - 2 * MASS_H + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'z'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'z_+1_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H + MASS_H + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'z_-1_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H - MASS_H + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'z_+2_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H + 2*MASS_H + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'z_-2_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H - 2*MASS_H + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'z_+3_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H + 3*MASS_H + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge },
+            { 'type' : 'z_-3_'+(i+1), 'mz' : ((y_ion_base - MASS_N - 2 * MASS_H - 3*MASS_H + charge * MASS_H) / charge) - MASS_ELECTRON, 'z' : charge }
 
             ]);
         }
