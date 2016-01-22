@@ -317,7 +317,7 @@ var combine_all_peptides = function(peps) {
             }
 
             if ("corex" in pep) {
-                has_corex = true;
+                has_corex = pep.corex;
             }
 
             if ("possible_mods" in pep && pep.activation !== 'HCD') {

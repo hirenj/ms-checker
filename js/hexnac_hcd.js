@@ -10,6 +10,10 @@ var HexNAcHCD = function HexNAcHCD() {
 
 util.inherits(HexNAcHCD,require('./processing-step.js'));
 
+var onlyUnique = function(value, index, self) {
+    return self.indexOf(value) === index;
+};
+
 var open_db = function(filename) {
     return new Promise(function(resolve,reject) {
         var db = new sqlite3.Database(filename,sqlite3.OPEN_READWRITE,function(err) {
@@ -75,7 +79,17 @@ var is_glcnac_mass = function(mz,error) {
 };
 
 var is_core2_mass = function(mz,error) {
-    return (check_mass(MASS_H+(mod_masses['HexNAc']*2),mz,error));
+    var is_407 = check_mass(MASS_H+(mod_masses['HexNAc']*2),mz,error);
+    var is_568 = check_mass(mod_masses['HexNAc']+mod_masses['HexHexNAc']+MASS_H,mz,error);
+    if (! is_407 && ! is_568) {
+        return false;
+    }
+    if (is_407) {
+        return "HexNAcHexNAc";
+    }
+    if (is_568) {
+        return "HexHexNAcHexNAc";
+    }
 };
 
 
@@ -236,7 +250,11 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
         var mass = peak.mass;
         var intensity = peak.intensity;
         if ( is_core2_mass(mass,{'ppm' : 10 }) ) {
-            is_core2 = true;
+            if (is_core2) {
+                is_core2 = is_core2.split('/').concat(is_core2_mass(mass,{'ppm' : 10 })).filter(onlyUnique).join('/');
+            } else {
+                is_core2 = is_core2_mass(mass,{'ppm' : 10 });
+            }
         }
         if ( is_glcnac_mass(mass,error) ) {
             accept_mass( glcnac_masses, glcnac_intensities , mass, intensity);
@@ -265,7 +283,7 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
             console.log("Conflicting HexNAc types ", pep.hexnac_type,hexnac_type);
         }
         if (is_core2) {
-            pep.corex = true;
+            pep.corex = is_core2;
         }
     } else {
         pep.galnac_intensity = 0;
