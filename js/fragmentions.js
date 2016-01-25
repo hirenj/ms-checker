@@ -277,8 +277,8 @@ var sum_mods = function(array,idx) {
     return array.filter(function(mod) { return mod[0] === idx; }).map(function(mod) { return mod[2]; }).reduce(function(curr,next) { return curr + next; },0);
 };
 
-var calculate_peptide_masses = function(pep) {
-    var mods = quantitative.modifications_cache[pep.PeptideID] || [];
+var calculate_peptide_masses = function(pep,modifications) {
+    var mods = modifications || quantitative.modifications_cache[pep.PeptideID] || [];
     var masses = pep.Sequence.split('').map(function(aa,idx) { return MASS_AMINO_ACIDS[aa] + sum_mods(mods,idx+1);  });
     return masses.concat(MASS_H_MINUS_ELECTRON + 2*MASS_H + MASS_O);
 };

@@ -212,6 +212,8 @@ var process_data = function(filename,sibling_files) {
             global_datablock.metadata = meta;
         });
 
+        return ppm.retrieve_all_ppms(db);
+
         var quant_promise = quantitative.init_caches(db).then(function() {
              return quantitative.retrieve_quantified_peptides(db).then(tracker('Retrieve quantified peptides')).then(partial(quantitative.check_quantified_peptides,db)).then(tracker('Check quantified peptides'));
         });

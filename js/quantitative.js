@@ -61,7 +61,7 @@ FROM ProcessingNodeParameters \
 WHERE ParameterName = "QuantificationMethod"';
 
 
-const all_peptide_modifications_sql = 'SELECT \
+const glyco_peptide_modifications_sql = 'SELECT \
     PeptideID, Position, ModificationName, DeltaMass \
 FROM PeptidesAminoAcidModifications \
     LEFT JOIN AminoAcidModifications USING (AminoAcidModificationID) \
@@ -99,6 +99,18 @@ WHERE \
         WHERE FileInfos.Filename NOT LIKE "%raw" \
             AND Peptides.ConfidenceLevel = 3 \
             ) \
+';
+
+const all_peptide_modifications_sql = 'SELECT \
+    PeptideID, Position, ModificationName, DeltaMass \
+FROM PeptidesAminoAcidModifications \
+    LEFT JOIN AminoAcidModifications USING (AminoAcidModificationID) \
+UNION \
+\
+SELECT \
+    PeptideID, -1, ModificationName, DeltaMass \
+FROM PeptidesTerminalModifications \
+    LEFT JOIN AminoAcidModifications ON PeptidesTerminalModifications.TerminalModificationID = AminoAcidModifications.AminoAcidModificationID \
 ';
 
 const all_peptide_modifications_count_sql = 'SELECT \
@@ -430,7 +442,7 @@ var produce_peptide_modification_data = function(db,pep) {
                     total_count = rows[0].count + rows[1].count;
                 }
             });
-            db.each(all_peptide_modifications_sql,[],function(err,mods) {
+            db.each(glyco_peptide_modifications_sql,[],function(err,mods) {
                 idx += 1;
                 peptide_modifications_cache[mods.PeptideID] =  peptide_modifications_cache[mods.PeptideID] || [];
                 var mod_name = mods.ModificationName.replace(/-/g,'');
