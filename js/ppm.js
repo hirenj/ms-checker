@@ -106,6 +106,8 @@ var retrieve_all_ppms = function(db) {
 
 	var all_mods_promise = db.each(retrieve_mods_sql,[],mods_function);
 
+	//ggplot(foo)+geom_boxplot(aes(x=cuts,y=V3),coef=3)
+	//foo$cuts = cut(foo$V2, breaks = seq(-15, 15, by = 0.5))
 	//blah = by(foo$V3,cut(foo$V2,breaks=seq(-15,15,by=0.5)),function(x) {length(x[x > 3.104]) })
 	//blah = by(foo$V3,cut(foo$V2,breaks=seq(-15,15,by=0.5)),function(x) { browser(); length(x[x > quantile(x,0.99)]) })
 
