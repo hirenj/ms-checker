@@ -30,8 +30,12 @@ const retrieve_ppm_all_peptides_sql = 'SELECT \
 	PeptideScores.ScoreValue as ScoreValue, \
 	MassPeaks.FileID as FileID \
 FROM Peptides LEFT JOIN  SpectrumHeaders USING(SpectrumID) LEFT JOIN MassPeaks USING(MassPeakID) LEFT JOIN PeptideScores USING(PeptideID) \
-WHERE SpectrumHeaders.Charge BETWEEN 2 AND 3 \
+WHERE SpectrumHeaders.Charge BETWEEN 2 AND 4 \
 ';
+
+// ScanEvents.ActivationType  Left join ScanEvents using (ScanEventID)
+// 16 = ETD, 32 = HCD, 1 = CID ?
+// Maybe just split the peptides up by ActivationType and ignore the actual value?
 
 const retrieve_mods_sql = 'SELECT DISTINCT \
 	PeptideID, Position, ModificationName, DeltaMass \
