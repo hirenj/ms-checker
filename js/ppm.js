@@ -30,7 +30,7 @@ const retrieve_ppm_all_peptides_sql = 'SELECT \
 	PeptideScores.ScoreValue as ScoreValue, \
 	MassPeaks.FileID as FileID \
 FROM Peptides LEFT JOIN  SpectrumHeaders USING(SpectrumID) LEFT JOIN MassPeaks USING(MassPeakID) LEFT JOIN PeptideScores USING(PeptideID) \
-WHERE SpectrumHeaders.Charge BETWEEN 2 AND 4 \
+WHERE SpectrumHeaders.Charge BETWEEN 2 AND 3 \
 ';
 
 const retrieve_mods_sql = 'SELECT DISTINCT \
@@ -69,10 +69,6 @@ var get_ppm = function(peptide,modifications) {
 
 var annotate_ppm = function(peps) {
 	peps.forEach(get_ppm);
-	// foo = peps.map(function(pep) { return pep.ppm+"\t"+pep.score; }).join("\n");
-	// require('fs').writeFileSync('foo.txt',foo);
-	// process.exit(1);
-	// debugger;
 	return peps;
 };
 
@@ -97,7 +93,7 @@ var retrieve_all_ppms = function(db) {
 		// if (all_mods[mods.PeptideID].filter(function(mod) { return mod[0] == position && mod[1] == mod_name;  }).length == 0) {
 			all_mods[mods.PeptideID].push([ position, mod_name, mods.DeltaMass ]);        	
 		// }
-		console.log(3246115 - mods.PeptideID);
+		// console.log(3246115 - mods.PeptideID);
 		if (mods.PeptideID !== last_peptide_id) {
 			all_mods[last_peptide_id] = all_mods[last_peptide_id].reduce(function(p,n) { return p + n[2] },0);
 			last_peptide_id = mods.PeptideID;
@@ -116,7 +112,7 @@ var retrieve_all_ppms = function(db) {
 			if ( ! all_values[pep.FileID]) {
 				all_values[pep.FileID] = [];
 			}
-			console.log(3246115 - pep.PeptideID);
+ 			// console.log(3246115 - pep.PeptideID);
 			if (pep.PeptideID !== current_pep.PeptideID && current_pep.PeptideID) {
 				current_pep.modifications = [ [ 1, 1 , all_mods[current_pep.PeptideID] ] ];
 				all_values[current_pep.FileID].push(derive_ppm_batch(current_pep));
@@ -133,18 +129,93 @@ var retrieve_all_ppms = function(db) {
 		}).then(function() {
 			current_pep.modifications = [ [ 1, 1 , all_mods[current_pep.PeptideID] ] ];
 			all_values[current_pep.FileID].push(derive_ppm_batch(current_pep));
-			var foo = "";
-			Object.keys(all_values).forEach(function(fileID) {
-				foo = foo+all_values[fileID].map(function(pep) { return fileID+"\t"+pep.ppm+"\t"+pep.score; }).join("\n");
-				foo = foo+"\n";
-			});
-			require('fs').writeFileSync('ppms.txt',foo);
 
-			debugger;
+			// var foo = "";
+			// foo = foo+all_values[fileID].map(function(pep) { return fileID+"\t"+pep.ppm+"\t"+pep.score; }).join("\n");
+			// foo = foo+"\n";
+			// // Plot values
+			// require('fs').writeFileSync('ppms.txt',foo);
+
+			var total_values = [];
+			Object.keys(all_values).forEach(function(fileID) {
+				total_values = total_values.concat(all_values[fileID]);
+			});
+
+			// Bin the scores by 0.5 ppm windows
+
+			var bin_info = bin_values(total_values);
+
+			var bins = bin_info.bins;
+
+			var first_bin = bin_info.first;
+
+			// Extract the count of outliers in each bin in top 99.9%
+
+			var quantiles = extract_quantiles(bins);
+
+			var total_sum = quantiles.reduce(function(p,n) { return p+n; },0);
+
+			// Look for window where the number of outliers is > 9/10*(total sum/100)
+
+			var left_bin = first_bin;
+
+			while (quantiles[0] !== null && quantiles.length > 2 && (quantiles[0] + quantiles[1] + quantiles[2])/3 < 0.9*(total_sum/100)) {
+				left_bin += 0.5;
+				quantiles.shift();
+			}
+
+			quantiles = quantiles.reverse();
+			var right_bin = first_bin + bins.length*0.5;
+			while (quantiles[0] !== null && quantiles.length > 2 && (quantiles[0] + quantiles[1] + quantiles[2])/3 < 0.9*(total_sum/100)) {
+				right_bin -= 0.5;
+				quantiles.shift();
+			}
+
 		});
 	});
 
 };
+
+var bin_values = function(values) {
+	var ppms = values.map(function(point) { return point.ppm; }).sort(function(a,b) { return a-b; });
+	var min_ppm = ppms[0];
+	min_ppm = Math.floor(2*min_ppm)/2;
+	var bins = [];
+	values.forEach(function(point) {
+		var bin_idx = Math.floor(2*(point.ppm - min_ppm));
+		if ( ! bins[bin_idx] ) {
+			bins[bin_idx] = [];
+		}
+		bins[bin_idx].push(point.score);
+	});
+	return { bins: bins, first: min_ppm };
+}
+
+var quantile = function(array,p) {
+	var sorted = array.slice().sort(function(a,b) { return a - b});
+	var idx = sorted.length * p;
+	return sorted[Math.ceil(idx) - 1];
+}
+
+var extract_quantiles = function(bins) {
+	var max_value = 0.5*(quantile(bins[1],0.999)+quantile(bins[2],0.999));
+	console.log(max_value);
+	return bins.map(function(bin) { return bin.filter(function(score) { return score > max_value; }).length });
+};
+
+var cumulative_sum = function(bins) {
+	var total = 0;
+	return bins.map(function(count) { total = total + count; return total; });
+};
+
+var diff = function(array) {
+	var result = [];
+	for (var i = 0; i < (array.length - 1); i++) {
+		result[i] = array[i+1] - array[i];
+	}
+	return result;
+}
+
 
 exports.get_ppm = get_ppm;
 exports.annotate_ppm = annotate_ppm;
