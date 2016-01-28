@@ -12,6 +12,7 @@ const MASS_O = 15.99491463;
 
 const MASS_AMINO_ACIDS = {
     A:71.03712,
+    B:114.53494,
     C:103.00919,
     D:115.02695,
     E:129.0426,
@@ -30,7 +31,9 @@ const MASS_AMINO_ACIDS = {
     T:101.04768,
     V:99.06842,
     W:186.07932,
-    Y:163.06332
+    X:0.0,
+    Y:163.06332,
+    Z:128.55059
 };
 
 const retrieve_matching_node_config_sql = 'SELECT \
@@ -277,8 +280,8 @@ var sum_mods = function(array,idx) {
     return array.filter(function(mod) { return mod[0] === idx; }).map(function(mod) { return mod[2]; }).reduce(function(curr,next) { return curr + next; },0);
 };
 
-var calculate_peptide_masses = function(pep) {
-    var mods = quantitative.modifications_cache[pep.PeptideID] || [];
+var calculate_peptide_masses = function(pep,modifications) {
+    var mods = modifications || quantitative.modifications_cache[pep.PeptideID] || [];
     var masses = pep.Sequence.split('').map(function(aa,idx) { return MASS_AMINO_ACIDS[aa] + sum_mods(mods,idx+1);  });
     return masses.concat(MASS_H_MINUS_ELECTRON + 2*MASS_H + MASS_O);
 };

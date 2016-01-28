@@ -89,7 +89,7 @@ Multibar.prototype = {
 
 var mbars = new Multibar();
 
-[quantitative,ambiguous,hexnac_hcd,fragmentation,peptide].forEach(function(module) {
+[quantitative,ambiguous,hexnac_hcd,fragmentation,peptide,ppm].forEach(function(module) {
     module.on('task',function(desc) {
         if ( !process.stdin.isTTY ) {
           return;
@@ -211,14 +211,28 @@ var process_data = function(filename,sibling_files) {
         metadata.get_metadata(db).then(function(meta) {
             global_datablock.metadata = meta;
         });
+        var calculated_cutoffs = [];
 
-        var quant_promise = quantitative.init_caches(db).then(function() {
-             return quantitative.retrieve_quantified_peptides(db).then(tracker('Retrieve quantified peptides')).then(partial(quantitative.check_quantified_peptides,db)).then(tracker('Check quantified peptides'));
+        var ppms_promise = ppm.retrieve_all_ppms(db).then(function(ppm_cutoffs) {
+          ppm_cutoffs.forEach(function(cutoff) {
+            calculated_cutoffs.push(cutoff);
+          });
         });
-        var ambig_promise = ambiguous.retrieve_peptides(db).then(function(peps) { return peps? peps : []; });
 
-        var processing_promise = Promise.all([quant_promise,ambig_promise]).then(function(all_peps) {
+        var peptides_promise = ppms_promise.then(function() {
 
+          var quant_promise = quantitative.init_caches(db).then(function() {
+              return quantitative.retrieve_quantified_peptides(db).then(tracker('Retrieve quantified peptides')).then(partial(quantitative.check_quantified_peptides,db)).then(tracker('Check quantified peptides'));
+          });
+
+          var ambig_promise = Promise.resolve(true).then(function() {
+              return ambiguous.retrieve_peptides(db).then(function(peps) { return peps? peps : []; });
+          });
+
+          return Promise.all([quant_promise,ambig_promise]);
+        });
+
+        var processing_promise = peptides_promise.then(function(all_peps) {
             var merged = Array.prototype.concat.apply([], all_peps);
             return merged;
         }).then(tracker('Read from DB'))
@@ -232,6 +246,7 @@ var process_data = function(filename,sibling_files) {
           .then(tracker('Fragmentation validation'))
           .then(ppm.annotate_ppm)
           .then(tracker('PPM annotation'))
+          .then(ppm.filter_peptides.bind(ppm,calculated_cutoffs))
           .then(spectra.filter_hcd_with_mods)
           .then(tracker('HCD modification filtering'));
 

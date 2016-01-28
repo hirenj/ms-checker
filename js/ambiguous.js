@@ -11,10 +11,11 @@ module.exports = exports = new Ambiguous();
 
 
 const retrieve_ambiguous_peptides_glyco_sql = 'SELECT \
-    Peptides.PeptideID, Peptides.SpectrumID, Peptides.Sequence, SpectrumHeaders.ScanNumbers as scan, SpectrumHeaders.Mass as mass, SpectrumHeaders.RetentionTime as retentionTime, FileInfos.Filename \
+    Peptides.PeptideID, Peptides.SpectrumID, Peptides.Sequence, SpectrumHeaders.ScanNumbers as scan, SpectrumHeaders.Mass as mass, SpectrumHeaders.RetentionTime as retentionTime, FileInfos.Filename, ScanEvents.ActivationType as ActivationType \
 FROM FileInfos \
     LEFT JOIN MassPeaks USING(FileID) \
     LEFT JOIN SpectrumHeaders USING(MassPeakID) \
+    LEFT JOIN ScanEvents USING(ScanEventID) \
     JOIN Peptides using(SpectrumID) \
     WHERE \
         (   FileInfos.FileName LIKE "%xGalNAc%" \
