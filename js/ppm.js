@@ -20,16 +20,18 @@ WHERE SpectrumHeaders.Charge BETWEEN 2 AND 4 \
 // 16 = ETD, 32 = HCD, 1 = CID ?
 // Maybe just split the peptides up by ActivationType and ignore the actual value?
 
-const retrieve_mods_sql = 'SELECT DISTINCT \
-	PeptideID, Position, ModificationName, DeltaMass \
+const retrieve_mods_sql = 'SELECT \
+	PeptideID, 0 as Position, sum(DeltaMass) as DeltaMass \
 FROM PeptidesAminoAcidModifications \
 	LEFT JOIN AminoAcidModifications USING (AminoAcidModificationID) \
+GROUP BY PeptideID \
 UNION \
 SELECT \
-	PeptideID, -1 as Position, ModificationName, DeltaMass \
+	PeptideID, -1 as Position, sum(DeltaMass) as DeltaMass \
 FROM PeptidesTerminalModifications \
 	LEFT JOIN AminoAcidModifications ON PeptidesTerminalModifications.TerminalModificationID = AminoAcidModifications.AminoAcidModificationID \
-ORDER BY PeptideID';
+GROUP BY PeptideID \
+';
 
 
 var Ppm = function Ppm() {
@@ -80,27 +82,18 @@ var retrieve_all_ppms = function(db) {
 		exports.notify_progress(0.5,1);
 
 		if ( ! all_mods[mods.PeptideID] ) {
-			all_mods[mods.PeptideID] = [];
+			all_mods[mods.PeptideID] = 0;
 		}
-		var mod_name = mods.ModificationName.replace(/-/g,'');
-		var position = mods.Position < 0 ? 1 : mods.Position + 1;
-		all_mods[mods.PeptideID].push([ position, mod_name, mods.DeltaMass ]);
+
+		all_mods[mods.PeptideID] = all_mods[mods.PeptideID] + mods.DeltaMass;
 
 		if (mods.PeptideID !== last_peptide_id) {
-			all_mods[last_peptide_id] = all_mods[last_peptide_id].reduce(function(p,n) { return p + n[2] },0);
 			last_peptide_id = mods.PeptideID;
 		}
 	};
 
 
-	var all_mods_promise = db.each(retrieve_mods_sql,[],mods_function).then(function() {
-		all_mods[last_peptide_id] = all_mods[last_peptide_id].reduce(function(p,n) { return p + n[2] },0);
-	});
-
-	//ggplot(foo)+geom_boxplot(aes(x=cuts,y=V3),coef=3)
-	//foo$cuts = cut(foo$V2, breaks = seq(-15, 15, by = 0.5))
-	//blah = by(foo$V3,cut(foo$V2,breaks=seq(-15,15,by=0.5)),function(x) {length(x[x > 3.104]) })
-	//blah = by(foo$V3,cut(foo$V2,breaks=seq(-15,15,by=0.5)),function(x) { browser(); length(x[x > quantile(x,0.99)]) })
+	var all_mods_promise = db.each(retrieve_mods_sql,[],mods_function);
 
 	return all_mods_promise.then(function() {
 		exports.notify_progress(1,1);
