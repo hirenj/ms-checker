@@ -56,6 +56,15 @@ if (sources && ! Array.isArray(sources)) {
     sources = [ sources ];
 }
 
+var manifest = nconf.get('manifest');
+
+if (manifest) {
+    files_to_open = [];
+    sources = [];
+    // Read .tsv or .xls file with
+    // data on the manifest contents to build the output files
+}
+
 // Group files by source
 // Check for the ETD parent mass + RT + scan in all the files
 
