@@ -12,6 +12,7 @@ const MASS_O = 15.99491463;
 
 const MASS_AMINO_ACIDS = {
     A:71.03712,
+    B:114.53494,
     C:103.00919,
     D:115.02695,
     E:129.0426,
@@ -30,7 +31,9 @@ const MASS_AMINO_ACIDS = {
     T:101.04768,
     V:99.06842,
     W:186.07932,
-    Y:163.06332
+    X:0.0,
+    Y:163.06332,
+    Z:128.55059
 };
 
 const retrieve_matching_node_config_sql = 'SELECT \

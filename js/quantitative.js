@@ -132,10 +132,13 @@ const search_peptides_sql = 'SELECT \
     PrecursorIonQuanResultsSearchSpectra.QuanResultID, \
     PrecursorIonQuanResults.QuanChannelID, \
     PrecursorIonQuanResults.Area, \
+    ScanEvents.ActivationType as ActivationType, \
     ifnull(customdata.quantcount,0) as acceptedquant \
 FROM peptides \
     LEFT JOIN PrecursorIonQuanResultsSearchSpectra \
         ON peptides.SpectrumID = PrecursorIonQuanResultsSearchSpectra.SearchSpectrumID \
+    LEFT JOIN SpectrumHeaders USING(SpectrumID) \
+    LEFT JOIN ScanEvents USING(ScanEventID) \
     LEFT JOIN PrecursorIonQuanResults \
         ON PrecursorIonQuanResultsSearchSpectra.QuanResultID = PrecursorIonQuanResults.QuanResultID \
     LEFT JOIN (SELECT PeptideID, count(FieldID) as quantcount FROM CustomDataPeptides \

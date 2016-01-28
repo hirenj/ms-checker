@@ -1,35 +1,18 @@
 var masses = require('./fragmentions').calculate_peptide_mass;
 var quantitative = require('./quantitative');
-
-
-// const retrieve_ppm_all_peptides_sql = 'SELECT \
-//     Peptides.PeptideID as PeptideID, \
-//     Peptides.Sequence as Sequence, \
-//     SpectrumHeaders.Mass as Mass, \
-//     PeptideScores.ScoreValue as ScoreValue, \
-//     Position, \
-//     ModificationName, \
-//     DeltaMass \
-// FROM Peptides LEFT JOIN  SpectrumHeaders ON (Peptides.SpectrumID = SpectrumHeaders.SpectrumID) LEFT JOIN PeptideScores ON (Peptides.PeptideID = PeptideScores.PeptideID) LEFT JOIN ( \
-// SELECT \
-//     PeptideID, Position, ModificationName, DeltaMass \
-// FROM PeptidesAminoAcidModifications \
-//     LEFT JOIN AminoAcidModifications USING (AminoAcidModificationID) \
-// UNION \
-// SELECT \
-//     PeptideID, -1, ModificationName, DeltaMass \
-// FROM PeptidesTerminalModifications \
-//     LEFT JOIN AminoAcidModifications ON PeptidesTerminalModifications.TerminalModificationID = AminoAcidModifications.AminoAcidModificationID \
-// ) as mods ON (Peptides.PeptideID = mods.PeptideID) \
-// ';
+var util = require('util');
 
 const retrieve_ppm_all_peptides_sql = 'SELECT \
 	Peptides.PeptideID as PeptideID, \
 	Peptides.Sequence as Sequence, \
 	SpectrumHeaders.Mass as Mass, \
 	PeptideScores.ScoreValue as ScoreValue, \
+	ScanEvents.ActivationType as ActivationType, \
 	MassPeaks.FileID as FileID \
-FROM Peptides LEFT JOIN  SpectrumHeaders USING(SpectrumID) LEFT JOIN MassPeaks USING(MassPeakID) LEFT JOIN PeptideScores USING(PeptideID) \
+FROM Peptides LEFT JOIN  SpectrumHeaders USING(SpectrumID) \
+			  LEFT JOIN MassPeaks USING(MassPeakID) \
+			  LEFT JOIN PeptideScores USING(PeptideID) \
+			  LEFT JOIN ScanEvents USING(ScanEventID) \
 WHERE SpectrumHeaders.Charge BETWEEN 2 AND 4 \
 ';
 
@@ -48,13 +31,14 @@ FROM PeptidesTerminalModifications \
 	LEFT JOIN AminoAcidModifications ON PeptidesTerminalModifications.TerminalModificationID = AminoAcidModifications.AminoAcidModificationID \
 ORDER BY PeptideID';
 
-// const retrieve_ppm_all_peptides_sql = 'SELECT \
-//     Peptides.PeptideID as PeptideID, \
-//     Peptides.Sequence as Sequence, \
-//     SpectrumHeaders.Mass as Mass, \
-//     PeptideScores.ScoreValue as ScoreValue \
-// FROM Peptides LEFT JOIN  SpectrumHeaders ON (Peptides.SpectrumID = SpectrumHeaders.SpectrumID) LEFT JOIN PeptideScores ON (Peptides.PeptideID = PeptideScores.PeptideID) \
-// ';
+
+var Ppm = function Ppm() {
+
+};
+
+util.inherits(Ppm,require('./processing-step.js'));
+
+module.exports = exports = new Ppm();
 
 // We love Protein Prospector when trying to
 // figure out what the right masses should be
@@ -72,7 +56,7 @@ var get_ppm = function(peptide,modifications) {
 };
 
 var annotate_ppm = function(peps) {
-	peps.forEach(get_ppm);
+	peps.forEach(function(pep) { get_ppm(pep); });
 	return peps;
 };
 
@@ -88,23 +72,30 @@ var retrieve_all_ppms = function(db) {
 
 	var last_peptide_id = 0;
 
+	exports.notify_task('Retrieving modifications for Ppm estimation');
+	exports.notify_progress(0,1);
+
 	var mods_function = function(err,mods) {
+
+		exports.notify_progress(0.5,1);
+
 		if ( ! all_mods[mods.PeptideID] ) {
 			all_mods[mods.PeptideID] = [];
 		}
 		var mod_name = mods.ModificationName.replace(/-/g,'');
 		var position = mods.Position < 0 ? 1 : mods.Position + 1;
-		// if (all_mods[mods.PeptideID].filter(function(mod) { return mod[0] == position && mod[1] == mod_name;  }).length == 0) {
-			all_mods[mods.PeptideID].push([ position, mod_name, mods.DeltaMass ]);        	
-		// }
-		// console.log(3246115 - mods.PeptideID);
+		all_mods[mods.PeptideID].push([ position, mod_name, mods.DeltaMass ]);
+
 		if (mods.PeptideID !== last_peptide_id) {
 			all_mods[last_peptide_id] = all_mods[last_peptide_id].reduce(function(p,n) { return p + n[2] },0);
 			last_peptide_id = mods.PeptideID;
 		}
 	};
 
-	var all_mods_promise = db.each(retrieve_mods_sql,[],mods_function);
+
+	var all_mods_promise = db.each(retrieve_mods_sql,[],mods_function).then(function() {
+		all_mods[last_peptide_id] = all_mods[last_peptide_id].reduce(function(p,n) { return p + n[2] },0);
+	});
 
 	//ggplot(foo)+geom_boxplot(aes(x=cuts,y=V3),coef=3)
 	//foo$cuts = cut(foo$V2, breaks = seq(-15, 15, by = 0.5))
@@ -112,73 +103,105 @@ var retrieve_all_ppms = function(db) {
 	//blah = by(foo$V3,cut(foo$V2,breaks=seq(-15,15,by=0.5)),function(x) { browser(); length(x[x > quantile(x,0.99)]) })
 
 	return all_mods_promise.then(function() {
+		exports.notify_progress(1,1);
+
+		exports.notify_task('Retrieving peptides for Ppm estimation');
+		exports.notify_progress(0,1);
+
 		return db.each(retrieve_ppm_all_peptides_sql,[],function(err,pep) {
-			if ( ! all_values[pep.FileID]) {
-				all_values[pep.FileID] = [];
+
+			exports.notify_progress(0.5,1);
+
+			if ( ! all_values[pep.ActivationType+""]) {
+				all_values[pep.ActivationType+""] = [];
 			}
- 			// console.log(3246115 - pep.PeptideID);
 			if (pep.PeptideID !== current_pep.PeptideID && current_pep.PeptideID) {
-				current_pep.modifications = [ [ 1, 1 , all_mods[current_pep.PeptideID] ] ];
-				all_values[current_pep.FileID].push(derive_ppm_batch(current_pep));
-				if (Math.abs(current_pep.ppm) > 20) {
-					debugger;
-				}
+				current_pep.modifications = all_mods[current_pep.PeptideID] ? [ [ 1, 1 , all_mods[current_pep.PeptideID] ] ] : [];
+				all_values[current_pep.ActivationType].push(derive_ppm_batch(current_pep));
 			}
 
 			current_pep.PeptideID = pep.PeptideID;
 			current_pep.FileID = pep.FileID;
+			current_pep.ActivationType = pep.ActivationType+"";
 			current_pep.Sequence = pep.Sequence;
 			current_pep.ScoreValue = pep.ScoreValue;
 			current_pep.mass = pep.Mass;
+
 		}).then(function() {
+
+			exports.notify_progress(1,1);
+
 			current_pep.modifications = [ [ 1, 1 , all_mods[current_pep.PeptideID] ] ];
-			all_values[current_pep.FileID].push(derive_ppm_batch(current_pep));
+			all_values[current_pep.ActivationType].push(derive_ppm_batch(current_pep));
 
-			// var foo = "";
-			// foo = foo+all_values[fileID].map(function(pep) { return fileID+"\t"+pep.ppm+"\t"+pep.score; }).join("\n");
-			// foo = foo+"\n";
-			// // Plot values
-			// require('fs').writeFileSync('ppms.txt',foo);
-
-			var total_values = [];
-			Object.keys(all_values).forEach(function(fileID) {
-				total_values = total_values.concat(all_values[fileID]);
+			var value_infos = Object.keys(all_values).map(function(activationType) {
+				return { 'values' : all_values[activationType], 'activation' : activationType };
 			});
 
-			// Bin the scores by 0.5 ppm windows
+			value_infos.forEach(function(values) {
+				calculate_boundaries(values);
+				delete values.values;
+			});
 
-			var bin_info = bin_values(total_values);
-
-			var bins = bin_info.bins;
-
-			var first_bin = bin_info.first;
-
-			// Extract the count of outliers in each bin in top 99.9%
-
-			var quantiles = extract_quantiles(bins);
-
-			var total_sum = quantiles.reduce(function(p,n) { return p+n; },0);
-
-			// Look for window where the number of outliers is > 9/10*(total sum/100)
-
-			var left_bin = first_bin;
-
-			while (quantiles[0] !== null && quantiles.length > 2 && (quantiles[0] + quantiles[1] + quantiles[2])/3 < 0.9*(total_sum/100)) {
-				left_bin += 0.5;
-				quantiles.shift();
-			}
-
-			quantiles = quantiles.reverse();
-			var right_bin = first_bin + bins.length*0.5;
-			while (quantiles[0] !== null && quantiles.length > 2 && (quantiles[0] + quantiles[1] + quantiles[2])/3 < 0.9*(total_sum/100)) {
-				right_bin -= 0.5;
-				quantiles.shift();
-			}
-
+			return value_infos;
 		});
 	});
 
 };
+
+var filter_peptides = function(cutoffs, peptides) {
+	var cutoffs_by_activation = {};
+	cutoffs.forEach(function(cutoff) {
+		cutoffs_by_activation[cutoff.activation] = cutoff;
+	});
+	return peptides.filter(function(pep) {
+		if (cutoffs_by_activation[pep.ActivationType]) {
+			cutoffs_by_activation[pep.ActivationType].activation = pep.activation;
+			return pep.ppm <= cutoffs_by_activation[pep.ActivationType].max && pep.ppm >= cutoffs_by_activation[pep.ActivationType].min;
+		}
+	});
+};
+
+var calculate_boundaries = function(data) {
+
+	var total_values = data.values;
+
+	// Bin the scores by 0.5 ppm windows
+
+	var bin_info = bin_values(total_values);
+
+	var bins = bin_info.bins;
+
+	if (bins.length < 1) {
+		return;
+	}
+
+	var first_bin = bin_info.first;
+
+	// Extract the count of outliers in each bin in top 99.9%
+
+	var quantiles = extract_quantiles(bins);
+
+	var total_sum = quantiles.reduce(function(p,n) { return p+n; },0);
+
+	// Look for window where the number of outliers is > 9/10*(total sum/100)
+
+	var left_bin = first_bin;
+
+	while (quantiles[0] !== null && quantiles.length > 2 && (quantiles[0] + quantiles[1] + quantiles[2])/3 < 0.9*(total_sum/100)) {
+		left_bin += 0.5;
+		quantiles.shift();
+	}
+
+	quantiles = quantiles.reverse();
+	var right_bin = first_bin + bins.length*0.5;
+	while (quantiles[0] !== null && quantiles.length > 2 && (quantiles[0] + quantiles[1] + quantiles[2])/3 < 0.9*(total_sum/100)) {
+		right_bin -= 0.5;
+		quantiles.shift();
+	}
+	data.min = left_bin;
+	data.max = right_bin;
+}
 
 var bin_values = function(values) {
 	var ppms = values.map(function(point) { return point.ppm; }).sort(function(a,b) { return a-b; });
@@ -203,7 +226,6 @@ var quantile = function(array,p) {
 
 var extract_quantiles = function(bins) {
 	var max_value = 0.5*(quantile(bins[1],0.999)+quantile(bins[2],0.999));
-	console.log(max_value);
 	return bins.map(function(bin) { return bin.filter(function(score) { return score > max_value; }).length });
 };
 
@@ -224,3 +246,4 @@ var diff = function(array) {
 exports.get_ppm = get_ppm;
 exports.annotate_ppm = annotate_ppm;
 exports.retrieve_all_ppms = retrieve_all_ppms;
+exports.filter_peptides = filter_peptides;
