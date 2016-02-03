@@ -204,16 +204,17 @@ var tracker = function(label) {
   return function(peps) { return peps; }
 };
 
-var process_data = function(filename,sibling_files) {
+var process_data = function(filename,sibling_files,source) {
     var global_datablock = {'data' : {}, 'metadata' : {}};
     return open_db(filename).then(function(db) {
+        db.source = source;
         promisify_sqlite(db);
         metadata.get_metadata(db).then(function(meta) {
             global_datablock.metadata = meta;
         });
         var calculated_cutoffs = [];
 
-        var ppms_promise = ppm.retrieve_all_ppms(db).then(function(ppm_cutoffs) {
+        var ppms_promise = ppm.select_ppm_cutoffs(db).then(function(ppm_cutoffs) {
           ppm_cutoffs.forEach(function(cutoff) {
             calculated_cutoffs.push(cutoff);
           });
@@ -286,7 +287,7 @@ var process_files = function(files,sources) {
         var other_files = files_by_source[source].filter(function(other_file) {
             return other_file !== file;
         });
-        return process_data(file,other_files).then(function(block) {
+        return process_data(file,other_files,source).then(function(block) {
             blocks.push(block);
             return self_func();
         });

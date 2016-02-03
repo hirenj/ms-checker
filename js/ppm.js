@@ -1,6 +1,7 @@
 var masses = require('./fragmentions').calculate_peptide_mass;
 var quantitative = require('./quantitative');
 var util = require('util');
+var nconf = require('nconf');
 
 const retrieve_ppm_all_peptides_sql = 'SELECT \
   Peptides.PeptideID as PeptideID, \
@@ -66,6 +67,31 @@ var derive_ppm_batch = function(pep) {
   get_ppm(pep,pep.modifications);
   return {'ppm' : pep.ppm, 'score' : pep.ScoreValue };
 };
+
+var select_ppm_cutoffs = function(db) {
+  if (nconf.get('ppm-'+db.source+'-min') && nconf.get('ppm-'+db.source+'-max')) {
+    var min_val = parseFloat(nconf.get('ppm-'+db.source+'-min'));
+    var max_val = parseFloat(nconf.get('ppm-'+db.source+'-max'));
+    return Promise.resolve([
+      { 'activation' : '1', 'min' : min_val, 'max' : max_val },
+      { 'activation' : '16', 'min' : min_val, 'max' : max_val },
+      { 'activation' : '32', 'min' : min_val, 'max' : max_val }
+    ]);
+  }
+
+  if (nconf.get('ppm-min') && nconf.get('ppm-max')) {
+    var min_val = parseFloat(nconf.get('ppm-min'));
+    var max_val = parseFloat(nconf.get('ppm-max'));
+    return Promise.resolve([
+      { 'activation' : '1', 'min' : min_val, 'max' : max_val },
+      { 'activation' : '16', 'min' : min_val, 'max' : max_val },
+      { 'activation' : '32', 'min' : min_val, 'max' : max_val }
+    ]);
+  } else {
+    return retrieve_all_ppms(db);
+  }
+}
+
 
 var retrieve_all_ppms = function(db) {
   var current_pep = { 'modifications' : [] };
@@ -238,5 +264,5 @@ var diff = function(array) {
 
 exports.get_ppm = get_ppm;
 exports.annotate_ppm = annotate_ppm;
-exports.retrieve_all_ppms = retrieve_all_ppms;
+exports.select_ppm_cutoffs = select_ppm_cutoffs;
 exports.filter_peptides = filter_peptides;
