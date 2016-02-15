@@ -129,11 +129,138 @@ var filter_ambiguous_spectra = function(all_peps) {
     });
     Object.keys(peptides_by_spectrum).forEach(function(spectrumID) {
         var peps = peptides_by_spectrum[spectrumID];
-        if (peps.map(function(pep) { return pep.Sequence; }).filter(onlyUnique).length > 1) {
-            bad_spectra.push(parseInt(spectrumID));
+        var seqs = peps.map(function(pep) { return pep.Sequence; }).filter(onlyUnique);
+        var lengths = seqs.map(function(seq) { return seq.length; }).filter(onlyUnique);
+
+        // If there's only one sequence, we don't have to do anything
+
+        if (seqs.length < 2) {
+            return;
         }
+
+        // If we have more than one length of sequence mapped to this spectrum
+        // we don't want to keep it
+
+        if (lengths.length > 1) {
+            bad_spectra.push(parseInt(spectrumID));
+            return;
+        }
+
+        // We need to look for single amino acid differences between peptides
+        // to look for the Leucine / Isoleucine difference between peptides.
+
+        var aas = seqs.map(function(seq) {  return seq.split(''); });
+        var diff_string = '';
+        for (var i = 0; i < aas[0].length; i++) {
+            var pos_aas = aas.map(function(aa_set) { return aa_set[i]; }).filter(onlyUnique);
+            if (pos_aas.length < 2) {
+                return;
+            }
+            diff_string = diff_string + pos_aas.join('');
+        }
+
+        // If the difference between the two sequences only consists of I and L
+        // then the sequences are the same.
+
+        if (diff_string.match(/^[IL]+$/)) {
+            return;
+        }
+
+
+        // If we don't match the Leucine / Isoleucine get out of jail
+        // free card, we should mark this as a bad spectrum
+
+        bad_spectra.push(parseInt(spectrumID));
     });
     return all_peps.filter(function(pep) { return bad_spectra.indexOf(pep.SpectrumID) < 0; });
+};
+
+var calculate_deltacn = function(all_peps) {
+    var grouped_peptides = {};
+
+    all_peps.forEach(function(pep) {
+        var key = pep.SpectrumID;
+        if ( ! grouped_peptides[key] )  {
+            grouped_peptides[key] = [];
+        }
+        grouped_peptides[key].push(pep);
+    });
+    Object.keys(grouped_peptides).forEach(function(pep_id) {
+        var peps = grouped_peptides[pep_id].sort(function(a,b) {
+            return a.score - b.score;
+        }).reverse();
+        if (peps.length > 1) {
+            var last_score = peps[0].score;
+            peps.forEach(function(pep) {
+                pep.deltacn = (last_score - pep.score) / last_score;
+            });
+        } else {
+            peps[0].deltacn = 0;
+        }
+    });
+    return all_peps;
+};
+
+var filter_deltacn = function(cutoff,all_peps) {
+    return all_peps.filter(function(pep) { return pep.deltacn <= cutoff; });
+};
+
+var merge_modifications_deltacn = function(all_peps) {
+    var grouped_peptides = {};
+
+    all_peps.forEach(function(pep) {
+        var key = pep.SpectrumID;
+        if ( ! grouped_peptides[key] )  {
+            grouped_peptides[key] = [];
+        }
+        grouped_peptides[key].push(pep);
+    });
+    Object.keys(grouped_peptides).forEach(function(pep_id) {
+        var peps = grouped_peptides[pep_id];
+        if (peps.length > 1) {
+            // We should split the peptides into ambiguous and unambiguous
+            var ambiguous = peps.filter(function(pep) { return pep.possible_mods; });
+            var unambiguous = peps.filter(function(pep) { return pep.modifications; });
+
+            // If there is only a single unambiguous, then we just use the unambiguous and drop the other peptides
+            if (unambiguous.length < 2) {
+                ambiguous.forEach(function(pep) { pep.drop = true; });
+                return;
+            }
+
+            // More than one unambiguous should merge together to form an ambiguous
+            if (unambiguous.length > 1) {
+                ambiguous.push(merge_unambiguous(unambiguous));
+            }
+
+            // All the ambiguous should then be merged together, placed onto the first peptide
+            // and then the other peptides should be dropped.
+            merge_ambiguous(ambiguous);
+            debugger;
+        }
+    });
+    return all_peps.filter(function(pep) { return ! pep.drop; });
+};
+
+var merge_unambiguous = function(peps) {
+    debugger;
+    var pep_positions = peps.map(function(pep,i) { if ( i > 0 ) { pep.drop = true; } return pep.modifications[0][0]; });
+
+    // This should really be merged per composition
+    var min_pos = Math.min.apply(Math,pep_positions);
+    var max_pos = Math.max.apply(Math,pep_positions);
+    peps[0].modifications.forEach(function(mod) {
+        mod[3] = min_pos;
+        mod[4] = max_pos;
+    });
+    peps[0].made_ambiguous = true;
+    peps[0].possible_mods = peps[0].modifications;
+    debugger;
+    return peps[0];
+}
+
+var merge_ambiguous = function(peps) {
+    return;
 }
 
 var extract_composition = function(mods) {
@@ -199,6 +326,9 @@ exports.composition = extract_composition;
 exports.combine = function(peps) {
     return require('./combiner').combine(peps);
 }
+exports.calculate_deltacn = calculate_deltacn;
+exports.filter_deltacn = filter_deltacn;
+exports.merge_modifications_deltacn = merge_modifications_deltacn;
 exports.modification_key = modification_key;
 exports.fix_site_numbers = fix_ids;
 exports.filter_ambiguous_spectra = filter_ambiguous_spectra;
