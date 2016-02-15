@@ -287,6 +287,11 @@ var check_potential_pair = function(db,pep,num_dimethyl,channel_conf) {
 
 // Channel identifier found in
 // ProcessingNodeParameters.ParameterName QuantificationMethod
+
+// We wish to combine peptides that have the same Peptide ID, but have
+// different quant channels so that we don't have repeated rows for different
+// components of the same quantification result.
+
 var combine_quantified_peptides = function(peps,channel_conf) {
     var all_peps = {};
     peps.forEach(function(pep) {
