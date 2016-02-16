@@ -334,7 +334,7 @@ var combine_all_peptides = function(peps) {
                     quant_intensity.max = pep.quant_intensity_range[1];
                 }
             }
-            spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan, 'ppm' : pep.ppm } );
+            spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan, 'ppm' : pep.ppm, 'mass' : pep.mass , 'charge' : pep.charge } );
             activations.push( pep.activation );
         });
 

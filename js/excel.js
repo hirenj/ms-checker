@@ -2,7 +2,33 @@ var xlsx = require('node-xlsx');
 var fs = require('fs');
 
 var write_excel_file = function(datablock,filename) {
-    var rows = [[ "source", "uniprot", "gene","multiple_proteins", "peptide_id", "quant" , "quant_mad", "singlet_confidence", "quant_min_intensity", "quant_max_intensity", "hexnac_type", "hexnac_ratio", "sequence", "peptide_start", "peptide_end", "composition", "score", "spectra", "ppm", "activation", "etd_eval" , "site", "site_composition", "ambiguous"  ]];
+    var rows = [[   "source",
+                    "uniprot",
+                    "gene",
+                    "multiple_proteins",
+                    "peptide_id",
+                    "quant",
+                    "quant_mad",
+                    "singlet_confidence",
+                    "quant_min_intensity",
+                    "quant_max_intensity",
+                    "hexnac_type",
+                    "hexnac_ratio",
+                    "sequence",
+                    "peptide_start",
+                    "peptide_end",
+                    "composition",
+                    "score",
+                    "spectra",
+                    "ppm",
+                    "activation",
+                    "precursor",
+                    "charge",
+                    "etd_eval",
+                    "site",
+                    "site_composition",
+                    "ambiguous"
+                ]];
     var metadata = [];
     var peptide_id = 0;
     if (! Array.isArray(datablock.metadata) && datablock.metadata ) {
@@ -51,9 +77,11 @@ var write_excel_file = function(datablock,filename) {
             data.push(pep.peptide_start + pep.sequence.length - 1);
             data.push(pep.composition.join(';'));
             data.push(pep.spectra.map(function(spec) {  return spec.score ? spec.score.toFixed(2) : 'ND';  }).join(","));
-            data.push(pep.spectra.map(function(spec) {  return spec.rt + "-" + spec.scan;  }).join(","));
+            data.push(pep.spectra.map(function(spec) {  return spec.rt.toFixed(3) + "-" + spec.scan;  }).join(","));
             data.push(pep.spectra.map(function(spec) {  return spec.ppm.toFixed(3);  }).join(","));
             data.push(pep.activation.join(','));
+            data.push(pep.spectra.map(function(spec) {  return spec.mass.toFixed(3);  }).join(","));
+            data.push(pep.spectra.map(function(spec) {  return spec.charge;  }).join(","));
             data.push(pep.made_ambiguous || '');
             if (pep.sites) {
                 pep.sites.forEach(function(site) {

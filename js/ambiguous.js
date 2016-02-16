@@ -18,6 +18,7 @@ const retrieve_ambiguous_peptides_glyco_sql = 'SELECT \
     SpectrumHeaders.ScanNumbers as scan, \
     SpectrumHeaders.Mass as mass, \
     SpectrumHeaders.RetentionTime as retentionTime, \
+    SpectrumHeaders.Charge as charge, \
     FileInfos.Filename, \
     ScanEvents.ActivationType as ActivationType \
 FROM FileInfos \
@@ -53,6 +54,7 @@ const retrieve_ambiguous_peptides_sql = 'SELECT \
     SpectrumHeaders.ScanNumbers as scan, \
     SpectrumHeaders.Mass as mass, \
     SpectrumHeaders.RetentionTime as retentionTime, \
+    SpectrumHeaders.Charge as charge, \
     FileInfos.Filename \
 FROM FileInfos \
     LEFT JOIN MassPeaks USING(FileID) \

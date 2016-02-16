@@ -247,6 +247,7 @@ var get_spectrum = function(db,pep,processing_node,no_cache) {
         pep.retentionTime = spectrum.rt;
         pep.scan = spectrum.scan;
         pep.mass = spectrum.mass;
+        pep.charge = spectrum.charge;
         pep.activation = spectrum.activation;
     });
 

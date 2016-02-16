@@ -134,6 +134,8 @@ const search_peptides_sql = 'SELECT \
     PrecursorIonQuanResults.Area, \
     ScanEvents.ActivationType as ActivationType, \
     peptides.SearchEngineRank, \
+    SpectrumHeaders.Mass as mass, \
+    SpectrumHeaders.Charge as charge, \
     ifnull(customdata.quantcount,0) as acceptedquant \
 FROM peptides \
     LEFT JOIN PrecursorIonQuanResultsSearchSpectra \

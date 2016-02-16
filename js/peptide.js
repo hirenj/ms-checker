@@ -351,7 +351,44 @@ var merge_ambiguous = function(peps) {
     if (peps.length < 2) {
         return;
     }
-    throw new Error("Merging of ambiguous has not been implemented");
+    var pep_positions = [].concat.apply([], peps.map(function(pep,i) {
+        return [].concat.apply([], pep.possible_mods.map(function(mod) { return [ mod[3]+"-"+mod[1], mod[4]+"-"+mod[1] ]; }));
+    }));
+
+    peps.forEach(function(pep,i) {
+        if ( i > 0 ) {
+            pep.drop = true;
+        }
+    });
+    var ambig_sites_by_composition = {};
+    pep_positions.forEach(function(range) {
+        var bits = range.split('-');
+        if ( ! ambig_sites_by_composition[bits[1]] ) {
+            ambig_sites_by_composition[bits[1]] = [];
+        }
+        ambig_sites_by_composition[bits[1]].push(parseInt(bits[0]));
+    });
+
+    Object.keys(ambig_sites_by_composition).forEach(function(comp) {
+        var sites = ambig_sites_by_composition[comp];
+        var min_pos = Math.min.apply(Math,sites);
+        var max_pos = Math.max.apply(Math,sites);
+        ambig_sites_by_composition[comp] = { 'min' : min_pos, 'max' : max_pos };
+    });
+
+    peps[0].possible_mods.forEach(function(mod) {
+        mod[3] = ambig_sites_by_composition[mod[1]].min;
+        mod[4] = ambig_sites_by_composition[mod[1]].max;
+    });
+
+    // Prepare the peptide so that it acts like an
+    // ambiguous peptide
+
+    peps[0].made_ambiguous = "delta_cn_filter";
+    if ( ! peps[0].Composition ) {
+        peps[0].Composition =  extract_composition(peps[0].possible_mods);
+    }
+
     return;
 }
 
