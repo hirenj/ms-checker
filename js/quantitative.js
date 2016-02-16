@@ -122,7 +122,7 @@ SELECT \
 FROM PeptidesTerminalModifications \
 ';
 
-const search_peptides_count_sql = 'SELECT count(*) as count from Peptides where ConfidenceLevel = 3 and SearchEngineRank <= 3';
+const search_peptides_count_sql = 'SELECT count(*) as count from Peptides where ConfidenceLevel = 3 and SearchEngineRank <= 4';
 
 const search_peptides_sql = 'SELECT \
     peptides.PeptideID, \
@@ -146,7 +146,7 @@ FROM peptides \
                 WHERE FieldID in (SELECT FieldID FROM CustomDataFields WHERE DisplayName = "QuanResultID") GROUP BY PeptideID) as customdata \
         ON peptides.PeptideID = customdata.PeptideID  \
 WHERE peptides.ConfidenceLevel = 3 \
-AND SearchEngineRank <= 3 \
+AND SearchEngineRank <= 4 \
 AND peptides.PeptideID in (SELECT distinct PeptideID \
     FROM PeptidesAminoAcidModifications \
     WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \

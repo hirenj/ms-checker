@@ -1,4 +1,5 @@
 var util = require('util');
+var nconf = require('nconf');
 
 const peptide_metadata_sql = 'SELECT \
     Description, \
@@ -181,6 +182,13 @@ var filter_ambiguous_spectra = function(all_peps) {
 };
 
 var calculate_deltacn = function(all_peps) {
+
+    if ( ! nconf.get('feature_enable_deltacn')) {
+        return all_peps;
+    }
+
+    console.log("Enabling Delta CN checking");
+
     var grouped_peptides = {};
 
     all_peps.forEach(function(pep) {
@@ -207,10 +215,18 @@ var calculate_deltacn = function(all_peps) {
 };
 
 var filter_deltacn = function(cutoff,all_peps) {
+    if (! nconf.get('feature_enable_deltacn')) {
+        return all_peps.filter(function(pep) { return pep.SearchEngineRank <= 1; });
+    }
+
     return all_peps.filter(function(pep) { return pep.deltacn <= cutoff; });
 };
 
 var merge_modifications_deltacn = function(all_peps) {
+    if (! nconf.get('feature_enable_deltacn')) {
+        return all_peps;
+    }
+
     var grouped_peptides = {};
 
     all_peps.forEach(function(pep) {

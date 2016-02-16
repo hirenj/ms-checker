@@ -42,7 +42,7 @@ FROM FileInfos \
     AND \
         Peptides.ConfidenceLevel = 3 \
     AND \
-        Peptides.SearchEngineRank <= 3 \
+        Peptides.SearchEngineRank <= 4 \
 ';
 
 const retrieve_ambiguous_peptides_sql = 'SELECT \
@@ -61,7 +61,7 @@ FROM FileInfos \
     WHERE \
         Peptides.ConfidenceLevel = 3 \
     AND \
-        Peptides.SearchEngineRank <= 3 \
+        Peptides.SearchEngineRank <= 4 \
 ';
 
 
