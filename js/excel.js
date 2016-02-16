@@ -1,4 +1,5 @@
 var xlsx = require('node-xlsx');
+var nconf = require('nconf');
 var fs = require('fs');
 
 var write_excel_file = function(datablock,filename) {
@@ -14,7 +15,7 @@ var write_excel_file = function(datablock,filename) {
                     "quant_max_intensity",
                     "hexnac_type",
                     "hexnac_ratio",
-                    "has_corex",
+                    nconf.get('feature_enable_corex') ? "has_corex" : null,
                     "sequence",
                     "peptide_start",
                     "peptide_end",
@@ -30,6 +31,9 @@ var write_excel_file = function(datablock,filename) {
                     "site_composition",
                     "ambiguous"
                 ]];
+
+    rows[0] = rows[0].filter(function(val) { return val; });
+
     var metadata = [];
     var peptide_id = 0;
     if (! Array.isArray(datablock.metadata) && datablock.metadata ) {
@@ -73,11 +77,12 @@ var write_excel_file = function(datablock,filename) {
                 data.push(null);
                 data.push(null);
             }
-
-            if (pep.has_corex) {
-                data.push(pep.has_corex);
-            } else {
-                data.push(null);
+            if (nconf.get('feature_enable_corex')) {
+                if (pep.has_corex) {
+                    data.push(pep.has_corex);
+                } else {
+                    data.push(null);
+                }
             }
 
             data.push(pep.sequence);

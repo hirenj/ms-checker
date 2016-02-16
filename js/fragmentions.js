@@ -2,6 +2,7 @@ var util = require('util');
 var spectra = require('./spectrum');
 var quantitative = require('./quantitative');
 var peptide = require('./peptide');
+var nconf = require('nconf');
 
 var site_re = peptide.site_re;
 
@@ -213,17 +214,22 @@ var resolve_modifications = function(pep,aa_re) {
 
         match = seq.match(aa_re);
 
-        // If the minimal sequence around the site
-        // contains more than one possible site
-        // we should mark this as an imprecise site
-        // of sorts, and claim that the peptide is
-        // in fact ambiguous
+        if ( nconf.get('feature_enable_precise_etd') ) {
 
-        if ( match.length  > 1 && groups[aagroup].length > 1 ) {
-            is_etd_precise = false;
-            group_ambiguous = true;
-            is_ambiguous = true;
+            // If the minimal sequence around the site
+            // contains more than one possible site
+            // we should mark this as an imprecise site
+            // of sorts, and claim that the peptide is
+            // in fact ambiguous
+
+            if ( match.length  > 1 && groups[aagroup].length > 1 ) {
+                is_etd_precise = false;
+                group_ambiguous = true;
+                is_ambiguous = true;
+            }
+
         }
+
 
         // If there are more possible sites than
         // there are actual modifications for the
@@ -255,8 +261,7 @@ var resolve_modifications = function(pep,aa_re) {
         }
         pep.possible_mods = pep.modifications;
         delete pep.modifications;
-        pep.made_ambiguous = true;
-        pep.is_etd_precise = is_etd_precise;
+        pep.made_ambiguous = (! is_etd_precise ) ? 'missing_exact_etd_site_coverage' : true;
     }
     return pep;
 };
