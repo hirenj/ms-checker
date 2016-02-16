@@ -65,5 +65,8 @@ processor.process(files_to_open,sources).then(function(blocks) { return processo
         });
         excel_writer.write(combined,nconf.get('output')+'.xls').catch(console.log.bind(console));
     }
-}).catch(console.log.bind(console));
+}).catch(function(err) {
+    console.error(err);
+    console.error(err.stack);
+});
 

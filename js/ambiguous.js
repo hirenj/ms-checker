@@ -11,7 +11,15 @@ module.exports = exports = new Ambiguous();
 
 
 const retrieve_ambiguous_peptides_glyco_sql = 'SELECT \
-    Peptides.PeptideID, Peptides.SpectrumID, Peptides.Sequence, SpectrumHeaders.ScanNumbers as scan, SpectrumHeaders.Mass as mass, SpectrumHeaders.RetentionTime as retentionTime, FileInfos.Filename, ScanEvents.ActivationType as ActivationType \
+    Peptides.PeptideID, \
+    Peptides.SpectrumID, \
+    Peptides.Sequence, \
+    Peptides.SearchEngineRank, \
+    SpectrumHeaders.ScanNumbers as scan, \
+    SpectrumHeaders.Mass as mass, \
+    SpectrumHeaders.RetentionTime as retentionTime, \
+    FileInfos.Filename, \
+    ScanEvents.ActivationType as ActivationType \
 FROM FileInfos \
     LEFT JOIN MassPeaks USING(FileID) \
     LEFT JOIN SpectrumHeaders USING(MassPeakID) \
@@ -34,11 +42,18 @@ FROM FileInfos \
     AND \
         Peptides.ConfidenceLevel = 3 \
     AND \
-        Peptides.SearchEngineRank = 1 \
+        Peptides.SearchEngineRank <= 4 \
 ';
 
 const retrieve_ambiguous_peptides_sql = 'SELECT \
-    Peptides.PeptideID, Peptides.SpectrumID, Peptides.Sequence, SpectrumHeaders.ScanNumbers as scan, SpectrumHeaders.Mass as mass, SpectrumHeaders.RetentionTime as retentionTime, FileInfos.Filename \
+    Peptides.PeptideID, \
+    Peptides.SpectrumID, \
+    Peptides.Sequence, \
+    Peptides.SearchEngineRank, \
+    SpectrumHeaders.ScanNumbers as scan, \
+    SpectrumHeaders.Mass as mass, \
+    SpectrumHeaders.RetentionTime as retentionTime, \
+    FileInfos.Filename \
 FROM FileInfos \
     LEFT JOIN MassPeaks USING(FileID) \
     LEFT JOIN SpectrumHeaders USING(MassPeakID) \
@@ -46,7 +61,7 @@ FROM FileInfos \
     WHERE \
         Peptides.ConfidenceLevel = 3 \
     AND \
-        Peptides.SearchEngineRank = 1 \
+        Peptides.SearchEngineRank <= 4 \
 ';
 
 

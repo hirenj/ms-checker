@@ -1,4 +1,6 @@
 var fs = require('fs');
+var nconf = require('nconf');
+
 var contaminants = require('./contaminants');
 
 const fasta_files_sql = "SELECT FileName FROM FastaFiles";
@@ -47,6 +49,17 @@ var get_pd_metadata = function(db,metadata) {
 };
 
 
+var write_feature_flags = function() {
+    var opts = nconf.get();
+    var results = [];
+    Object.keys(opts).forEach(function(flag) {
+        if (flag.match('feature')) {
+            results.push(flag);
+        }
+    });
+    return results.join(',');
+};
+
 var get_self_version = function(metadata) {
     return new Promise(function(resolve,reject) {
 
@@ -57,7 +70,8 @@ var get_self_version = function(metadata) {
             metadata['software'].push({
                 'name' : 'ms-checker',
                 'version' : json.revision[0],
-                'run-date' : (new Date()).toISOString()
+                'run-date' : (new Date()).toISOString(),
+                'feature-flags' : write_feature_flags()
             });
             resolve();
         });
