@@ -349,11 +349,15 @@ var combine_all_peptides = function(peps) {
         }
 
         var block = {
-            'multi_protein' : false,
+            'multi_protein' : null,
             'sequence' : first_pep.Sequence
         };
+
         if (first_pep.uniprot.length > 1) {
-            block.multi_protein = true;
+            block.multi_protein = "protein";
+        }
+        if (first_pep.multi_peptide) {
+            block.multi_protein = block.multi_protein ? block.multi_protein+',peptide' : 'peptide';
         }
 
         if (quant !== null) {
@@ -397,7 +401,12 @@ var combine_all_peptides = function(peps) {
                 rescale_ids(pep.pep_start, first_pep.pep_start, temp_block);
                 return temp_block.ambiguous_mods[0];
             }).filter(onlyUnique);
-            block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).length > 0 ? 'missing_site_coverage' : '';
+            block.made_ambiguous = '';
+
+            var ambig_reasons = peps.filter(function(pep) { return "made_ambiguous" in pep; }).map(function(pep) { return pep.made_ambiguous == true ? 'missing_site_coverage' : pep.made_ambiguous; });
+            if (ambig_reasons.length > 0) {
+                block.made_ambiguous = ambig_reasons.sort().filter(onlyUnique).join(',');
+            }
         } else {
             block.made_ambiguous = peps.filter(function(pep) { return pep.made_ambiguous; }).map(function(pep) { return pep.made_ambiguous; }).filter(onlyUnique)[0];
             if (! block.made_ambiguous) {
@@ -462,6 +471,9 @@ var write_possible_mods = function(mods) {
         return sort_val_a - sort_val_b;
     }).map(function(mod) {
         if (mod[3]) {
+            if (mod[3] == mod[4]) {
+                return ""+mod[3]+"("+mod[1]+")";
+            }
             return ""+mod[3]+"-"+mod[4]+"("+mod[1]+")";
         }
         return mod[0]+"("+mod[1]+")";

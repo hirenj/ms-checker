@@ -91,6 +91,8 @@ var produce_peptide_data = function(db,pep) {
             var uniprot = pep_data.Description.split('|')[1];
             if (uniprot && pep.uniprot.indexOf(uniprot) < 0) {
                 pep.uniprot.push(uniprot);
+            } else {
+                return;
             }
             var genes;
             var re = /(?:GN=)([^\s]+)/g;
@@ -154,7 +156,7 @@ var filter_ambiguous_spectra = function(all_peps) {
         for (var i = 0; i < aas[0].length; i++) {
             var pos_aas = aas.map(function(aa_set) { return aa_set[i]; }).filter(onlyUnique);
             if (pos_aas.length < 2) {
-                return;
+                continue;
             }
             diff_string = diff_string + pos_aas.join('');
         }
@@ -163,6 +165,9 @@ var filter_ambiguous_spectra = function(all_peps) {
         // then the sequences are the same.
 
         if (diff_string.match(/^[IL]+$/)) {
+            peps.forEach(function(pep) {
+                pep.multi_peptide = true;
+            });
             return;
         }
 
@@ -236,30 +241,101 @@ var merge_modifications_deltacn = function(all_peps) {
             // All the ambiguous should then be merged together, placed onto the first peptide
             // and then the other peptides should be dropped.
             merge_ambiguous(ambiguous);
-            debugger;
         }
     });
     return all_peps.filter(function(pep) { return ! pep.drop; });
 };
 
 var merge_unambiguous = function(peps) {
-    debugger;
-    var pep_positions = peps.map(function(pep,i) { if ( i > 0 ) { pep.drop = true; } return pep.modifications[0][0]; });
+    // For each peptide, get a list of the position - composition pairs that
+    // are mapped for that peptide
 
-    // This should really be merged per composition
-    var min_pos = Math.min.apply(Math,pep_positions);
-    var max_pos = Math.max.apply(Math,pep_positions);
-    peps[0].modifications.forEach(function(mod) {
-        mod[3] = min_pos;
-        mod[4] = max_pos;
+    var pep_positions = peps.map(function(pep,i) {
+        return pep.modifications.map(function(mod) { return mod[0]+"-"+mod[1]; });
     });
-    peps[0].made_ambiguous = true;
+
+    // Find the sites that are common to all the peptides
+    var site_counts = {};
+    pep_positions.forEach(function(sites) {
+        sites.forEach(function(site) {
+            site_counts[site] = (site_counts[site] || 0) + 1;
+        });
+    });
+
+    var unambig_sites = Object.keys(site_counts).filter(function(site) {
+                            return site_counts[site] === pep_positions.length;
+                        }).map(function(site) {
+                            var bits = site.split('-');
+                            return parseInt(bits[0]);
+                        });
+
+    if (unambig_sites.length == pep_positions[0].length) {
+        return;
+    }
+
+    peps.forEach(function(pep,i) {
+        if ( i > 0 ) {
+            pep.drop = true;
+        }
+    });
+
+
+    // Find the sites that are unique
+    var ambig_sites_by_composition = {};
+    Object.keys(site_counts).filter(function(site) {
+        return site_counts[site] !== pep_positions.length;
+    }).forEach(function(site) {
+        var bits = site.split('-');
+        if ( ! ambig_sites_by_composition[bits[1]] ) {
+            ambig_sites_by_composition[bits[1]] = [];
+        }
+        ambig_sites_by_composition[bits[1]].push(parseInt(bits[0]));
+    });
+
+    // Summarise the min and max position for the sites that
+    // are now ambiguous for each composition
+
+    Object.keys(ambig_sites_by_composition).forEach(function(comp) {
+        var sites = ambig_sites_by_composition[comp];
+        var min_pos = Math.min.apply(Math,sites);
+        var max_pos = Math.max.apply(Math,sites);
+        ambig_sites_by_composition[comp] = { 'min' : min_pos, 'max' : max_pos };
+    });
+
+
+    // We can modify the modifications on the first peptide,
+    // leaving the common sites as unambiguous (i.e. same max and min)
+    // while using the composition indexed max and mins for sites
+    // to make the other sites more ambiguous.
+
+    peps[0].modifications.forEach(function(mod) {
+        if (unambig_sites.indexOf(mod[0]) >= 0) {
+            mod[3] = mod[1];
+            mod[4] = mod[1];
+            return;
+        }
+        mod[3] = ambig_sites_by_composition[mod[1]].min;
+        mod[4] = ambig_sites_by_composition[mod[1]].max;
+    });
+
+    // Prepare the peptide so that it acts like an
+    // ambiguous peptide
+
+    peps[0].made_ambiguous = "delta_cn_filter";
     peps[0].possible_mods = peps[0].modifications;
-    debugger;
+    delete peps[0].modifications;
+    if ( ! peps[0].Composition ) {
+        peps[0].Composition =  extract_composition(peps[0].possible_mods);
+    }
+
     return peps[0];
 }
 
 var merge_ambiguous = function(peps) {
+    if (peps.length < 2) {
+        return;
+    }
+    throw new Error("Merging of ambiguous has not been implemented");
     return;
 }
 
