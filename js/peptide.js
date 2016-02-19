@@ -244,7 +244,7 @@ var merge_modifications_deltacn = function(all_peps) {
             var unambiguous = peps.filter(function(pep) { return pep.modifications; });
 
             // If there is only a single unambiguous, then we just use the unambiguous and drop the other peptides
-            if (unambiguous.length < 2) {
+            if (unambiguous.length == 1) {
                 ambiguous.forEach(function(pep) { pep.drop = true; });
                 return;
             }
