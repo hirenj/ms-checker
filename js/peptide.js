@@ -303,7 +303,7 @@ var merge_unambiguous = function(peps) {
                         });
 
     if (unambig_sites.length == pep_positions[0].length) {
-        return pep[0];
+        return peps[0];
     }
 
     peps.forEach(function(pep,i) {
