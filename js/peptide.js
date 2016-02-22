@@ -243,10 +243,11 @@ var merge_modifications_deltacn = function(all_peps) {
             var ambiguous = peps.filter(function(pep) { return pep.possible_mods; });
             var unambiguous = peps.filter(function(pep) { return pep.modifications; });
 
-            // If there is only a single unambiguous, then we just use the unambiguous and drop the other peptides
+            // If there is only a single unambiguous, then we need to consider this to
+            // be actually ambiguous... there's an argument to make that this is actually
+            // unambiguous.
             if (unambiguous.length == 1) {
-                ambiguous.forEach(function(pep) { pep.drop = true; });
-                return;
+                ambiguous = ambiguous.concat(make_ambiguous(unambiguous));
             }
 
             // More than one unambiguous should merge together to form an ambiguous
@@ -261,6 +262,22 @@ var merge_modifications_deltacn = function(all_peps) {
     });
     return all_peps.filter(function(pep) { return ! pep.drop; });
 };
+
+var make_ambiguous = function(peps) {
+    peps.forEach(function(pep) {
+        pep.modifications.forEach(function(mod) {
+            mod[3] = mod[0];
+            mod[4] = mod[0];
+        });
+        pep.made_ambiguous = "delta_cn_filter";
+        pep.possible_mods = pep.modifications;
+        delete pep.modifications;
+        if ( ! pep.Composition ) {
+            pep.Composition =  extract_composition(pep.possible_mods);
+        }
+    });
+    return peps;
+}
 
 var merge_unambiguous = function(peps) {
     // For each peptide, get a list of the position - composition pairs that
@@ -286,7 +303,7 @@ var merge_unambiguous = function(peps) {
                         });
 
     if (unambig_sites.length == pep_positions[0].length) {
-        return;
+        return pep[0];
     }
 
     peps.forEach(function(pep,i) {

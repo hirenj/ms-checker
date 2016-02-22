@@ -252,7 +252,7 @@ var process_data = function(filename,sibling_files,source) {
           .then(peptide.produce_peptide_scores_and_cleanup.bind(peptide,db))
           .then(tracker('Scores'))
           .then(peptide.calculate_deltacn.bind(peptide))
-          .then(peptide.filter_deltacn.bind(peptide,0.05))
+          .then(peptide.filter_deltacn.bind(peptide,parseFloat(nconf.get('deltacn-cutoff')) || 0 ))
           .then(tracker('Delta CN filtering'))
           .then(peptide.filter_ambiguous_spectra)
           .then(tracker('Filter ambiguous spectra'))
