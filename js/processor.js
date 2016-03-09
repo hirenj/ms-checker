@@ -92,6 +92,18 @@ var mbars = new Multibar();
 [quantitative,ambiguous,hexnac_hcd,fragmentation,peptide,ppm].forEach(function(module) {
     module.on('task',function(desc) {
         if ( !process.stdin.isTTY ) {
+          var max = -1;
+          this.addListener('progress',function(percentage) {
+              var barname = (module.constructor.name+" "+desc+(Array(50).join(' '))).substring(0,50);
+              var percentage_level = parseInt((10 * percentage).toFixed(0));
+              if (percentage_level > max) {
+                  max = percentage_level;
+                  console.log(barname + " " + max + "0 %");
+                  if (percentage_level == 10) {
+                    module.removeListener('progress',arguments.callee);
+                  }
+              }
+          });
           return;
         }
         this.addListener('progress',function(percentage) {
