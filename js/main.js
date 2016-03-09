@@ -14,9 +14,6 @@ try {
 }
 
 var nconf = require('nconf');
-var processor = require('../js/processor');
-
-var excel_writer = require('../js/excel');
 
 var fs = require('fs');
 
@@ -40,6 +37,11 @@ if (gui) {
 } else {
     nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
 }
+
+var processor = require('../js/processor');
+
+var excel_writer = require('../js/excel');
+
 var files_to_open = nconf.get('_') || [];
 
 if (gui) {

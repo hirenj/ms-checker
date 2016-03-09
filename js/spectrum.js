@@ -1,11 +1,15 @@
 var yauzl   = require('yauzl'),
-    byline  = require('byline');
+    byline  = require('byline'),
+    nconf   = require('nconf');
+
+var etd_alias = nconf.get('etd-alias');
+var hcd_alias = nconf.get('hcd-alias');
 
 const hcd_processing_node_number_sql = 'SELECT \
     ProcessingNodeNumber \
 FROM ProcessingNodeParameters \
 WHERE \
-    ParameterName = "ActivationTypeFilter" and ParameterValue = "Is#HCD"';
+    ParameterName = "ActivationTypeFilter" and ParameterValue = "Is#'+(hcd_alias ? hcd_alias : 'HCD')+'"';
 
 const child_processing_node_numbers_sql = 'SELECT ProcessingNodeNumber \
 FROM ProcessingNodes \
@@ -79,6 +83,37 @@ var unzip_spectrum = function(spectrum_text) {
         });
     });
 
+};
+
+var fix_activation = function(spectrum) {
+    if (etd_alias || hcd_alias) {
+        if (etd_alias && spectrum.activation == etd_alias) {
+            spectrum.activation = 'ETD';
+            return spectrum;
+        }
+        if (hcd_alias && spectrum.activation == hcd_alias) {
+            spectrum.activation = 'HCD';
+            return spectrum;
+        }
+        return spectrum;
+    }
+
+    // Retrieve the mapping of ETD and HCD identifier
+    // from the params and make this function a no-op if
+    // we don't have any mapping we need to do
+
+    if (nconf.get('hcd-alias')) {
+        hcd_alias = nconf.get('hcd-alias');
+    }
+    if (nconf.get('etd-alias')) {
+        etd_alias = nconf.get('etd-alias');
+    }
+
+    if ( ! hcd_alias && ! etd_alias ) {
+        fix_activation = function(spec) { return spec };
+    }
+
+    return fix_activation(spectrum);
 };
 
 var parse_spectrum = function(readStream) {
@@ -233,7 +268,7 @@ var get_spectrum = function(db,pep,processing_node,no_cache) {
         var mass = spectra[0].Mass;
         var scan = spectra[0].scan;
         var retentionTime = spectra[0].rt;
-        return unzip_spectrum(spectrum).then(parse_spectrum).then(function(spectrum){
+        return unzip_spectrum(spectrum).then(parse_spectrum).then(fix_activation).then(function(spectrum){
             spectrum.spectrumID = pep.SpectrumID;
             spectrum.charge = charge;
             spectrum.mass = mass;

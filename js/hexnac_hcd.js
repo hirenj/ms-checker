@@ -2,6 +2,7 @@ var util = require('util'),
     sqlite3 = require('sqlite3');
 var spectra = require('./spectrum');
 var peptide = require('./peptide');
+var nconf = require('nconf');
 var promisify_sqlite = require('./sqlite-promise');
 
 var HexNAcHCD = function HexNAcHCD() {
@@ -94,13 +95,22 @@ var find_partner_hcd = function(spectrum,glyco_mass,db) {
         return get_db(db).then(find_partner_hcd.bind(self,spectrum,glyco_mass));
     }
 
-    if ( ! db.partner ) {
+
+    // Normally, we should be able to search for HCD spectra
+    // using the MassPeak for each spectrum, which would be
+    // the same in the same file.
+    // However, if there is some wacky processing done on the
+    // file, we lose the connection between the HCD and the ETD
+    // spectrum on that table. We can force the search to use the
+    // slower method to find other scans and RTs that match with
+    // the ETD spectrum.
+    // FIXME - use the slow search by default, and then switch to
+    // using the fast search if we don't get any
+    if ( ! db.partner && ! nconf.get('hcd-dont-use-masspeaks') ) {
         return spectra.get_related_spectra(db,spectrum);
     }
 
-    return spectra.match_spectrum_data(db, spectrum.scan, spectrum.rt, spectrum.charge, spectrum.mass - glyco_mass).then(function(spectra) {
-        return spectra;
-    });
+    return spectra.match_spectrum_data(db, spectrum.scan, spectrum.rt, spectrum.charge, spectrum.mass - glyco_mass);
 };
 
 var search_partner_hcd_in_msfs = function(spectrum,db,glyco_mass) {

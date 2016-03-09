@@ -74,6 +74,7 @@ var select_ppm_cutoffs = function(db) {
     var max_val = parseFloat(nconf.get('ppm-'+db.source+'-max'));
     return Promise.resolve([
       { 'activation' : '1', 'min' : min_val, 'max' : max_val },
+      { 'activation' : '8', 'min' : min_val, 'max' : max_val },
       { 'activation' : '16', 'min' : min_val, 'max' : max_val },
       { 'activation' : '32', 'min' : min_val, 'max' : max_val }
     ]);
@@ -84,6 +85,7 @@ var select_ppm_cutoffs = function(db) {
     var max_val = parseFloat(nconf.get('ppm-max'));
     return Promise.resolve([
       { 'activation' : '1', 'min' : min_val, 'max' : max_val },
+      { 'activation' : '8', 'min' : min_val, 'max' : max_val },
       { 'activation' : '16', 'min' : min_val, 'max' : max_val },
       { 'activation' : '32', 'min' : min_val, 'max' : max_val }
     ]);
