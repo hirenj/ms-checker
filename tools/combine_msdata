@@ -1,0 +1,29 @@
+#!/usr/bin/node
+
+var nconf = require('nconf');
+var fs = require('fs');
+
+nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
+
+// Required: --input --source --output --sheet --msdata (.json)
+
+var merge_datas = function(current,data) {
+	Object.keys(data).forEach(function(up) {
+		if ( ! current[up]) {
+			current[up] = data[up];
+		} else {
+			current[up] = current[up].concat(data[up]);
+		}
+	});
+};
+
+
+var msdatas = nconf.get('input');
+
+var datas = msdatas.map(function(filename) { return JSON.parse(fs.readFileSync(filename)); });
+
+datas.reduce(function(prev,current) { prev.metadata = prev.metadata.concat(current.metadata); merge_datas(prev.data,current.data); return prev;  });
+
+console.log(JSON.stringify(datas[0]));
+
+// console.log(datas);
