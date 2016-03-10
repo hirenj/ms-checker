@@ -205,7 +205,15 @@ var resolve_modifications = function(pep,aa_re) {
         var start = null;
         var end;
         var match;
-
+        if ( ! seq.match(aa_re) ) {
+            made_ambiguous = true;
+            pep.invalid_modification = true;
+            groups[aagroup].forEach(function(mod) {
+                mod[3] = 0;
+                mod[4] = 0;
+            });
+            return pep;
+        }
         if ( seq.match(aa_re).length > groups[aagroup].length ) {
             is_ambiguous = true;
             while ( match = aa_re.exec(seq) ) {
@@ -268,7 +276,7 @@ var validate_peptide_coverage = function(db,peptides) {
         modified_peps.forEach(resolve_glyco_modifications);
         exports.notify_progress('progress',1,1);
     }).then(function() {
-        return peptides;
+        return peptides.filter(function(pep) { return ! pep.invalid_modification; });
     });
 };
 
