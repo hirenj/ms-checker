@@ -131,6 +131,8 @@ var search_partner_hcd_in_msfs = function(spectrum,db,glyco_mass) {
 const mod_masses = {
     'HexNAc' : 203.079373,
     'HexAHexHexNAc' : 541.06934,
+    'HexHexNAcNeuAc' : 744.267466,
+    'NeuAcHexNAc' : 582.214643,
     'HexHexNAc' : 365.132196,
     'Hex-HexNAc' : 365.132196,
     'Hex1HexNAc1' : 365.132196,
