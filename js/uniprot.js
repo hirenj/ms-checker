@@ -43,7 +43,10 @@ var connect_ftp = function(url) {
         ftp_site.on('error',reject);
     });
     ftp_site.connect(req);
-    return result;
+    return result.catch(function(err) {
+        console.log(err);
+        return null;
+    });
 };
 
 var download_file = function(ftp,path,filename) {
@@ -62,6 +65,11 @@ var download_file = function(ftp,path,filename) {
 var check_modified = function(timedata,url,filename) {
     var fsstat = timedata[0];
     var ftp_site = timedata[1];
+
+    if ( ! ftp_site ) {
+        return Promise.resolve(filename);
+    }
+
     var result = new Promise(function(resolve,reject) {
         ftp_site.lastMod(parse_url(url).path,function(err,date) {
             if (err) {
@@ -82,6 +90,7 @@ var check_modified = function(timedata,url,filename) {
 };
 
 var get_cached_file = function(url,filename) {
+    return Promise.resolve(filename);
     return Promise.all( [ get_modtime(filename), connect_ftp(url) ] ).then(function(promise_results) {
         return check_modified(promise_results,url,filename);
     });
