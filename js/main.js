@@ -65,7 +65,7 @@ processor.process(files_to_open,sources).then(function(blocks) { return processo
         fs.writeFile(nconf.get('output')+'.json',JSON.stringify(combined),function() {
             console.log("Wrote combined file");
         });
-        excel_writer.write(combined,nconf.get('output')+'.xls').catch(console.log.bind(console));
+        excel_writer.write(combined,nconf.get('output')+'.xlsx').catch(console.log.bind(console));
     }
 }).catch(function(err) {
     console.error(err);
