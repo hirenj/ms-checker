@@ -442,7 +442,7 @@ exports.site_re = /[STY]/g;
 
 if (nconf.get('feature_enable_nglyco')) {
     exports.mod_string = 'Deamidated';
-    exports.site_re = /N[^P][ST]/g;
+    exports.site_re = /(N$|N[^P]$|N[^P][ST])/g;
 }
 
 exports.init_caches = init_caches;
