@@ -1,5 +1,6 @@
 var peptide = require('./peptide');
 var uniprot_meta = require('./uniprot');
+var nconf = require('nconf');
 
 var not_hcd_filter = function(pep) {
     return (pep.activation !== 'HCD' && pep.activation !== 'CID');
@@ -60,7 +61,17 @@ var check_single_site = function(pep) {
         pep.modifications = indices.map(function(idx) {  return [ idx, pep.Composition[0].slice(2) ] ; });
         pep.made_ambiguous = 'inferred';
     }
-}
+};
+
+var rewrite_deamidation = function(peps) {
+    peps.forEach(function(pep) {
+        (pep.modifications || []).forEach(function(mod) {
+            if (mod[1].indexOf('Deamidated') >= 0) {
+                mod[1] = 'GlcNAc(b1-4)GlcNAc';
+            }
+        })
+    });
+};
 
 var combine_all_peptides = function(peps) {
     var data = {};
@@ -377,6 +388,11 @@ var combine_all_peptides = function(peps) {
             block.hexnac_type = Object.keys(hexnac_type).sort();
             block.hexnac_ratio = hexnac_ratios.join(',');
         }
+
+        if (nconf.get('feature_enable_nglyco')) {
+            rewrite_deamidation([first_pep]);
+        }
+
         if (first_pep.modifications) {
             block.sites = first_pep.modifications.map(function(mod) { return [ mod[0], mod[1] ]; } );
         }
