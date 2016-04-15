@@ -18,7 +18,7 @@ var nconf = require('nconf');
 var fs = require('fs');
 
 if (gui) {
-    nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).overrides( require('optimist')(gui.App.argv).argv );
+    nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).add('metadata', { type: 'literal', store: {} }).overrides( require('optimist')(gui.App.argv).argv );
 
     if (nconf.get('MS_DEBUG') || nconf.get('debug')) {
         gui.Window.get().showDevTools();
@@ -61,8 +61,14 @@ var manifest = nconf.get('manifest');
 if (manifest) {
     files_to_open = [];
     sources = [];
+
     // Read .tsv or .xls file with
     // data on the manifest contents to build the output files
+
+    var conf_data = require('../js/manifests').populateConf(manifest);
+    nconf.use('metadata', { type: 'literal', store: conf_data });
+    files_to_open = nconf.get('input_files');
+    sources = nconf.get('input_sources');
 }
 
 // Group files by source

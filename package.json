@@ -9,6 +9,7 @@
     "byline": "^4.2.1",
     "clone": "^1.0.2",
     "ftp": "^0.3.10",
+    "jsonpath-plus": "^0.15.0",
     "nconf": "^0.7.1",
     "node-xlsx": "^0.5.1",
     "optimist": "^0.6.1",
