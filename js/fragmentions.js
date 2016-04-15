@@ -3,6 +3,8 @@ var spectra = require('./spectrum');
 var quantitative = require('./quantitative');
 var peptide = require('./peptide');
 
+var site_re = peptide.site_re;
+
 const MASS_H = 1.007825035;
 const MASS_ELECTRON = 0.00054858026;
 const MASS_H_MINUS_ELECTRON = 1.007276455;
@@ -185,7 +187,7 @@ var get_coverage_for_sites = function(pep,b_ions) {
 };
 
 var resolve_glyco_modifications = function(pep) {
-    return resolve_modifications(pep,/[STY]/g);
+    return resolve_modifications(pep,site_re);
 };
 
 var resolve_modifications = function(pep,aa_re) {
