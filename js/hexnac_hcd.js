@@ -137,7 +137,8 @@ const mod_masses = {
     'Hex-HexNAc' : 365.132196,
     'Hex1HexNAc1' : 365.132196,
     'Hex' : 162.052823,
-    'HexHex' : 324.105646
+    'HexHex' : 324.105646,
+    'Deamidated:O' : -1
 };
 
 var calculate_glyco_composition = function(composition,mods) {
@@ -145,6 +146,9 @@ var calculate_glyco_composition = function(composition,mods) {
         var bits = comp.split('x');
         var count = parseInt(bits.shift());
         var mass = mod_masses[bits.join('x')];
+        if (mass < 0) {
+            return 0;
+        }
         if ( ! mass ) {
             console.log("Missing mass for ",bits.join('x'));
         }
@@ -159,6 +163,9 @@ var decide_spectrum = function(db,pep,spectrum) {
     }
     if (spectrum.activation !== 'HCD' && spectrum.activation !== 'CID' ) {
         var glyco_mass = calculate_glyco_composition(pep.Composition || peptide.composition(pep.modifications));
+        if (glyco_mass == 0) {
+            return;
+        }
         return search_partner_hcd_in_msfs.bind(self)(spectrum,db,glyco_mass)
                .then(check_galnac_glcnac_ratio.bind(null,pep));
     }

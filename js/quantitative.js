@@ -1,6 +1,8 @@
 var util = require('util');
 var peptide_search = require('./peptide.js');
 
+var mod_string = peptide_search.mod_string;
+
 Math.median = require('../js/math-median').median;
 
 var Quantitative = function Quantitative() {
@@ -70,7 +72,7 @@ WHERE \
     FROM PeptidesAminoAcidModifications \
     WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \
         FROM AminoAcidModifications \
-        WHERE ModificationName like "%Hex%") ) \
+        WHERE ModificationName like "%'+mod_string+'%") ) \
     OR PeptideID in (SELECT PeptideID \
         FROM \
             FileInfos LEFT JOIN MassPeaks USING(FileID) \
@@ -90,7 +92,7 @@ WHERE \
     FROM PeptidesAminoAcidModifications \
     WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \
         FROM AminoAcidModifications \
-        WHERE ModificationName like "%Hex%") ) \
+        WHERE ModificationName like "%'+mod_string+'%") ) \
     OR PeptideID in (SELECT PeptideID \
         FROM \
             FileInfos LEFT JOIN MassPeaks USING(FileID) \
@@ -153,7 +155,7 @@ AND peptides.PeptideID in (SELECT distinct PeptideID \
     FROM PeptidesAminoAcidModifications \
     WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \
         FROM AminoAcidModifications \
-        WHERE ModificationName like "%Hex%") \
+        WHERE ModificationName like "%'+mod_string+'%") \
     )';
 
 
@@ -469,7 +471,7 @@ var produce_peptide_modification_data = function(db,pep) {
                 }
             },reject);
         } else {
-            pep.modifications = (peptide_modifications_cache[pep.PeptideID] || []).filter( function(mod) { return (mod[1] || '').indexOf('Hex') >= 0 } ).map( clean_mod );
+            pep.modifications = (peptide_modifications_cache[pep.PeptideID] || []).filter( function(mod) { return (mod[1] || '').indexOf(mod_string) >= 0 } ).map( clean_mod );
             resolve();
         }
     });

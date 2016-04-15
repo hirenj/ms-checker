@@ -437,6 +437,14 @@ var init_caches = function(db) {
     return produce_peptide_score_data(db,{});
 };
 
+exports.mod_string = 'Hex';
+exports.site_re = /[STY]/g;
+
+if (nconf.get('feature_enable_nglyco')) {
+    exports.mod_string = 'Deamidated';
+    exports.site_re = /N[^P][ST]/g;
+}
+
 exports.init_caches = init_caches;
 exports.produce_peptide_data = produce_peptide_data;
 exports.produce_peptide_scores = produce_peptide_scores;
