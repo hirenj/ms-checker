@@ -1,5 +1,6 @@
 var util = require('util');
 var peptide_search = require('./peptide.js');
+var nconf = require('nconf');
 
 var mod_string = peptide_search.mod_string;
 
@@ -12,6 +13,29 @@ var Quantitative = function Quantitative() {
 util.inherits(Quantitative,require('./processing-step.js'));
 
 module.exports = exports = new Quantitative();
+
+
+var wt_channel = "light";
+var ko_channel = "medium";
+
+exports.swapChannelLabels = function(do_swap) {
+    if (do_swap) {
+        wt_channel = "medium";
+        ko_channel = "light";
+    } else {
+        wt_channel = "light";
+        ko_channel = "medium";
+    }
+}
+
+if (nconf.get('option-swap-channels')) {
+    exports.swapChannelLabels(true);
+}
+
+
+
+Object.defineProperty(exports, "wt_channel", { get: function () { return wt_channel; } });
+Object.defineProperty(exports, "ko_channel", { get: function () { return ko_channel; } });
 
 const dimethyl_counts_sql = 'SELECT \
     count(distinct Position) as count, PeptideID \
