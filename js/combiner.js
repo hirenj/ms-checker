@@ -188,7 +188,7 @@ var combine_all_peptides = function(peps) {
                 var seen = pep.QuanResultID in seen_quan_result_ids;
                 seen_quan_result_ids[pep.QuanResultID] = 1;
                 return ! seen;
-            }).map(function(pep) { return pep.areas[quantitative.ko_channel] / pep.areas[quantiative.wt_channel]; });
+            }).map(function(pep) { return pep.areas[quantitative.ko_channel] / pep.areas[quantitative.wt_channel]; });
 
             target_ratio = Math.median( all_ratios );
 
@@ -209,7 +209,7 @@ var combine_all_peptides = function(peps) {
 
         } else if (singlet_peps.length > 0)  {
 
-            target_ratio = singlet_peps[0].QuanChannelID[0] == quantiative.wt_channel ? 1/100000 : 100000;
+            target_ratio = singlet_peps[0].QuanChannelID[0] == quantitative.wt_channel ? 1/100000 : 100000;
 
             var channel_ids = singlet_peps.map(function(pep) { return pep.QuanChannelID[0]; }).filter(onlyUnique);
             singlet_peps.forEach(function(pep) {
@@ -238,7 +238,7 @@ var combine_all_peptides = function(peps) {
             // any other peptides that have a ratio.
             if (! target_ratio) {
                 if (pep.QuanChannelID.length > 1) {
-                    pep.unaccepted_quant = "ratio";//pep.areas[quantitative.ko_channel] / pep.areas[quantiative.wt_channel];
+                    pep.unaccepted_quant = "ratio";//pep.areas[quantitative.ko_channel] / pep.areas[quantitative.wt_channel];
                 } else if (pep.QuanChannelID.length == 1) {
                     pep.unaccepted_quant = "singlet_"+pep.QuanChannelID[0];
                 }
@@ -296,7 +296,7 @@ var combine_all_peptides = function(peps) {
             if (pep.acceptedquant && "has_pair" in pep && pep.has_pair === true && pep.used && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
                 // Potential ratio 1/100000 in the potential_light
                 // Potential ratio 100000 in the potential_medium 
-                quant = pep.QuanChannelID[0] == quantiative.wt_channel ? 'potential_wt' : 'potential_ko';
+                quant = pep.QuanChannelID[0] == quantitative.wt_channel ? 'potential_wt' : 'potential_ko';
             }
 
             if ( ! pep.acceptedquant ) {
