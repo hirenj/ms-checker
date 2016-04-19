@@ -298,6 +298,13 @@ var process_files = function(files,sources) {
         var self_func = arguments.callee;
         var file = files.shift();
         var source = sources.shift();
+        if ([].concat(nconf.get('option-swap-channels')).indexOf(source) >= 0) {
+          quantitative.swapChannelLabels(true);
+        } else {
+          quantitative.swapChannelLabels(false);
+        }
+
+
         if (! file) {
             return blocks;
         }

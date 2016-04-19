@@ -28,12 +28,6 @@ exports.swapChannelLabels = function(do_swap) {
     }
 }
 
-if (nconf.get('option-swap-channels')) {
-    exports.swapChannelLabels(true);
-}
-
-
-
 Object.defineProperty(exports, "wt_channel", { get: function () { return wt_channel; } });
 Object.defineProperty(exports, "ko_channel", { get: function () { return ko_channel; } });
 
