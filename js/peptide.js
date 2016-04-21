@@ -445,6 +445,11 @@ if (nconf.get('feature_enable_nglyco')) {
     exports.site_re = /N/g;
 }
 
+if (nconf.get('feature_enable_truncated_nglyco')) {
+    exports.mod_string = 'Hex';
+    exports.site_re = /[NSTY]/g;
+}
+
 exports.init_caches = init_caches;
 exports.produce_peptide_data = produce_peptide_data;
 exports.produce_peptide_scores = produce_peptide_scores;

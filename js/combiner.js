@@ -45,7 +45,7 @@ var check_single_site = function(pep) {
     var indices = [];
     var str = pep.Sequence;
     for(var i=0; i<str.length;i++) {
-        if (str[i] === "S" || str[i] == "T" || str[i] == "Y") indices.push(i+1);
+        if (str[i].match(peptide.site_re)) indices.push(i+1);
     }
     if (pep.modifications || ! pep.Composition) {
         if ( ! pep.Composition && ! pep.modifications) {
