@@ -52,7 +52,7 @@ var onlyUnique = function(value, index, self) {
     return self.indexOf(value) === index;
 };
 
-var check_mass = function(mass,mz,error) {
+var check_mass_test = function(mass,mz,error) {
     if (! error ) {
         return mz == mass;
     }
@@ -66,21 +66,46 @@ var check_mass = function(mass,mz,error) {
     return false;
 };
 
-var is_galnac_mass = function(mz,error) {
+var accumulated_peaks = [];
+
+var accumulate_peaks = function() {
+    accumulated_peaks = [];
+    check_mass = check_mass_accumulate;
+    return function() {
+        check_mass = check_mass_test;
+        var result = [].concat(accumulated_peaks);
+        accumulated_peaks = [];
+        return result;
+    };
+};
+
+var mass_check_spec_id = "";
+
+var check_mass_accumulate = function(mass,mz,error,intensity) {
+    var result = check_mass_test(mass,mz,error);
+    if (result) {
+        accumulated_peaks.push([mass_check_spec_id,mass,mz,intensity]);
+    }
+    return result;
+};
+
+var check_mass = check_mass_test;
+
+var is_galnac_mass = function(mz,error,intensity) {
     var galnac_138 = 138.055;
     var galnac_168 = 168.066;
-    return (check_mass(galnac_138,mz,error) || check_mass(galnac_168,mz,error) );
+    return (check_mass(galnac_138,mz,error,intensity) || check_mass(galnac_168,mz,error,intensity) );
 };
 
-var is_glcnac_mass = function(mz,error) {
+var is_glcnac_mass = function(mz,error,intensity) {
     var glcnac_126 = 126.055;
     var glcnac_144 = 144.065;
-    return (check_mass(glcnac_126,mz,error) || check_mass(glcnac_144,mz,error) );
+    return (check_mass(glcnac_126,mz,error,intensity) || check_mass(glcnac_144,mz,error,intensity) );
 };
 
-var is_core2_mass = function(mz,error) {
-    var is_407 = check_mass(MASS_H+(mod_masses['HexNAc']*2),mz,error);
-    var is_568 = check_mass(mod_masses['HexNAc']+mod_masses['HexHexNAc']+MASS_H,mz,error);
+var is_core2_mass = function(mz,error,intensity) {
+    var is_407 = check_mass(MASS_H+(mod_masses['HexNAc']*2),mz,error,intensity);
+    var is_568 = check_mass(mod_masses['HexNAc']+mod_masses['HexHexNAc']+MASS_H,mz,error,intensity);
     if (! is_407 && ! is_568) {
         return false;
     }
@@ -246,19 +271,22 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
 
     var is_core2 = false;
 
+    mass_check_spec_id = pep.Sequence+"-"+pep.SpectrumID;
+
     spectrum.peaks.forEach(function(peak) {
         var mass = peak.mass;
         var intensity = peak.intensity;
-        if ( is_core2_mass(mass,{'ppm' : 10 }) ) {
+        var core2_test = is_core2_mass(mass,{'ppm': 10},intensity);
+        if ( core2_test ) {
             if (is_core2) {
-                is_core2 = is_core2.split('/').concat(is_core2_mass(mass,{'ppm' : 10 })).filter(onlyUnique).join('/');
+                is_core2 = is_core2.split('/').concat(core2_test).filter(onlyUnique).join('/');
             } else {
-                is_core2 = is_core2_mass(mass,{'ppm' : 10 });
+                is_core2 = core2_test;
             }
         }
-        if ( is_glcnac_mass(mass,error) ) {
+        if ( is_glcnac_mass(mass,error,intensity) ) {
             accept_mass( glcnac_masses, glcnac_intensities , mass, intensity);
-        } else if ( is_galnac_mass(mass,error) ) {
+        } else if ( is_galnac_mass(mass,error,intensity) ) {
             accept_mass( galnac_masses, galnac_intensities , mass, intensity);
         }
     });
@@ -343,5 +371,7 @@ var test_spectra = function(db,max_spectrum_id,error) {
     });
 }
 
+
+exports.accumulate_peaks = accumulate_peaks;
 exports.guess_hexnac = guess_hexnac;
 exports.test_spectra = test_spectra;

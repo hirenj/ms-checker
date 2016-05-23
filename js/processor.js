@@ -268,6 +268,14 @@ var process_data = function(filename,sibling_files,source) {
           .then(spectra.filter_hcd_with_mods)
           .then(tracker('HCD modification filtering'));
 
+        if (nconf.get('track-hcd-oxonium')) {
+          var done_accumulating = hexnac_hcd.accumulate_peaks();
+          var output_filename = filename.split('/').reverse()[0].replace('\.msf','')+"-oxonium.txt";
+          processing_promise.then(function() {
+            fs.appendFile(output_filename, done_accumulating().map(function(peak) { return peak.join("\t"); }).join("\n"), function (err) {});
+          });
+        }
+
 
         return processing_promise.then(function(peps) {
             tracker('Finished tracking, did not lose')([]);
