@@ -1,5 +1,6 @@
 {
 	"input_files" : "$.MSF.Filename",
 	"input_sources" : "$.MSF[(paste( @ ,'_','Portion','Column','Enzyme'))]",
+	"cell_line" : "$.Source.Cell_line",
 	"ppm.*" : "$[(summarise_ppms( @ , @.PPM, @.MSF.pasted, @.MSF.Filename ))]"
 }

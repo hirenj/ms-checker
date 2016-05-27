@@ -9,13 +9,22 @@ const DELETED_URL = 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/d
 // Uniprot secondary accessions (find merged entries):
 const MERGED_URL = 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/docs/sec_ac.txt';
 
+// Cellosaurus respository
+const CELLOSAURUS_URL = 'ftp://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt';
+
 var UniprotMeta = function UniprotMeta() {
 
 };
 
 util.inherits(UniprotMeta,require('events').EventEmitter);
 
-exports = module.exports = new UniprotMeta();
+var CellosaurusMeta = function CellosaurusMeta() {
+
+};
+
+util.inherits(CellosaurusMeta,require('events').EventEmitter);
+
+exports = module.exports = {'uniprot': new UniprotMeta(), 'cellosaurus' : new CellosaurusMeta() };
 
 var get_modtime = function(filename) {
     return new Promise(function(resolve,reject) {
@@ -90,7 +99,6 @@ var check_modified = function(timedata,url,filename) {
 };
 
 var get_cached_file = function(url,filename) {
-    return Promise.resolve(filename);
     return Promise.all( [ get_modtime(filename), connect_ftp(url) ] ).then(function(promise_results) {
         return check_modified(promise_results,url,filename);
     });
@@ -111,6 +119,54 @@ var parse_metadata = function(filename) {
                 metadata[bits[0]] = bits[1] ? bits[1] : -1;
             });
             resolve();
+        });
+    });
+};
+
+var parse_cellosaurus = function(filename) {
+    return new Promise(function(resolve,reject) {
+        var current_entry = { names : [] };
+        cellosaurus = {};
+        fs.readFile(filename, function(err,data){
+            if (err){
+                reject(err);
+            }
+            data.toString().split('\n').filter(function(line) { return line.match(/(^ID|^AC|^SY|^OX|^DR|^HI|^\/\/)/); }).forEach(function(line) {
+                if (line == '//') {
+                    if (current_entry) {
+                        current_entry.names.forEach(function(name) {
+                            cellosaurus[name] = current_entry;
+                        });
+                    }
+                    current_entry = { names: [] };
+                    return;
+                }
+                var line_id = line.substr(0,5).trim();
+                var line_data = line.substr(5).trim();
+                if (line_id == 'ID' || line_id == 'SY') {
+                    current_entry.names = current_entry.names.concat(line_data.split(/;\s+/));
+                }
+                if (line_id == 'AC') {
+                    current_entry.acc = line_data;
+                }
+                if (line_id == 'OX') {
+                    current_entry.taxid = parseInt((/NCBI_TaxID=(\d+)/.exec(line_data) || [undefined,undefined])[1]);
+                }
+                if (line_id == 'DR' && line_data.match(/BTO\;/)) {
+                    current_entry.bto = (/BTO:(\d+)/.exec(line_data) || [undefined,undefined])[1];
+                }
+                if (line_id == 'HI') {
+                    current_entry.parent = (/!(.*)/.exec(line_data) || [undefined,undefined])[1].trim();
+                }
+            });
+            Object.keys(cellosaurus).forEach(function(name) {
+                var entry = cellosaurus[name];
+                if (entry.parent && ! entry.bto) {
+                    entry.bto = cellosaurus[entry.parent].bto;
+                }
+            });
+            console.log(cellosaurus['CHO-GS']);
+            resolve(true);
         });
     });
 };
@@ -138,4 +194,21 @@ UniprotMeta.prototype.updateIds = function(ids) {
     return (ids || []).map(function(id) {
         return self.isReplaced(id) || id;
     }).filter(function(id) { return id !== -1; });
+};
+
+var cellosaurus = null;
+
+CellosaurusMeta.prototype.init = function() {
+    console.log("Initing cellosaurus");
+    if (cellosaurus) {
+        return Promise.resolve(true);
+    }
+    return get_cached_file( CELLOSAURUS_URL, 'cellosaurus.txt').then(function(filename) {
+        cellosaurus = {};
+        return parse_cellosaurus(filename).catch(function(err) { cellosaurus = null; throw err; });
+    });
+};
+
+CellosaurusMeta.prototype.lookup = function(name) {
+    return Object.freeze(cellosaurus[name]);
 };

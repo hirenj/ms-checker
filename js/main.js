@@ -58,6 +58,8 @@ if (sources && ! Array.isArray(sources)) {
 
 var manifest = nconf.get('manifest');
 
+var metadata_ready = Promise.resolve(true);
+
 if (manifest) {
     files_to_open = [];
     sources = [];
@@ -69,12 +71,16 @@ if (manifest) {
     nconf.use('metadata', { type: 'literal', store: conf_data });
     files_to_open = nconf.get('input_files');
     sources = nconf.get('input_sources');
+    console.log(conf_data);
+    metadata_ready = require('../js/uniprot').cellosaurus.init();
 }
 
 // Group files by source
 // Check for the ETD parent mass + RT + scan in all the files
 
-processor.process(files_to_open,sources).then(function(blocks) { return processor.combine(blocks,sources) }).then(function(combined) {
+metadata_ready.then(function() { return processor.process(files_to_open,sources); })
+              .then(function(blocks) { return processor.combine(blocks,sources); })
+              .then(function(combined) {
     // console.log(combined);
     if (nconf.get('output')) {
         fs.writeFile(nconf.get('output')+'.json',JSON.stringify(combined),function() {

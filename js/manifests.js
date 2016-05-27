@@ -47,7 +47,7 @@ var populate_conf = function populate_conf(manifest) {
         return;
       }
       if (row[0].match(/^#/)) {
-        current_headers = row.map(function(header) { return header.replace('#',''); });
+        current_headers = row.map(function(header) { return header.replace('#','').replace(/\s/g,'_'); });
         current_headers.forEach(function(header) {
           conf_data[current_section][header] = [];
         });
@@ -58,7 +58,6 @@ var populate_conf = function populate_conf(manifest) {
       });
     });
   }
-  console.log(conf_data);
   var template = require('../resources/manifest_conf_mapping.template.json');
   return transform(conf_data, template, { paste: paste, summarise_ppms: summarise_ppms })
 };
