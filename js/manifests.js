@@ -1,7 +1,7 @@
 
 var nconf = require('nconf');
 var xlsx = require('node-xlsx');
-var JSONPath = require('jsonpath-plus');
+var transform = require('jsonpath-object-transform');
 
 var paste = function(self,sep) {
   var args = Array.prototype.slice.call(arguments);
@@ -13,11 +13,10 @@ var paste = function(self,sep) {
     }
     return curr.map(function(val,idx) { return val + sep + next[idx]; });
   });
-  return "pasted";
+  return "'pasted'";
 };
 
 var summarise_ppms = function(self,ppm,sources,filenames) {
-  console.log(arguments);
   var results = {};
   filenames.map(function(filename,i) {
     var pattern_match = ppm.MSF_pattern.map(function(pattern) { return pattern === '*' || filename.indexOf(pattern) >= 0;  });
@@ -29,7 +28,7 @@ var summarise_ppms = function(self,ppm,sources,filenames) {
     results[ "ppm-"+sources[i]+"-max" ] = ppm.Maximum[ppm_index];
   });
   self.parsed_ppm = results;
-  return "parsed_ppm";
+  return "'parsed_ppm'";
 };
 
 var populate_conf = function populate_conf(manifest) {
@@ -59,21 +58,9 @@ var populate_conf = function populate_conf(manifest) {
       });
     });
   }
+  console.log(conf_data);
   var template = require('../resources/manifest_conf_mapping.template.json');
-  var results = {};
-  Object.keys(template).forEach(function(path) {
-    var path_results = JSONPath({ flatten: true, sandbox: { paste: paste, summarise_ppms: summarise_ppms } }, template[path], conf_data);
-    if (path.indexOf('.') >= 0) {
-      path_results.forEach(function(path_result) {
-        Object.keys(path_result).forEach(function(key) {
-          results[key] = path_result[key];
-        });
-      });
-    } else {
-      results[path] = path_results;
-    }
-  });
-  return results;
+  return transform(conf_data, template, { paste: paste, summarise_ppms: summarise_ppms })
 };
 
 
