@@ -2,6 +2,7 @@
 var nconf = require('nconf');
 var xlsx = require('node-xlsx');
 var transform = require('jsonpath-object-transform');
+var cellosaurus = require('./uniprot').cellosaurus;
 
 var paste = function(self,sep) {
   var args = Array.prototype.slice.call(arguments);
@@ -29,6 +30,29 @@ var summarise_ppms = function(self,ppm,sources,filenames) {
   });
   self.parsed_ppm = results;
   return "'parsed_ppm'";
+};
+
+var populate_source_info = function(self,organism,tissue,cell_line) {
+  var results = {};
+  var cell_meta;
+  if (cell_line && (cell_meta = cellosaurus.lookup(cell_line))) {
+    if (! cell_meta) {
+      results['source-cell_line'] = cell_line;
+    } else {
+      results['source-cell_line'] = cell_meta.names[0];
+      results['source-organism'] = cell_meta.taxid;
+      results['source-organism_part'] = cell_meta.bto;
+      results['source-cellosaurus_id'] = cell_meta.acc;
+    }
+  } else {
+    results['source-organism'] = organism;
+    results['source-organism_part'] = tissue;
+    if (cell_line) {
+      results['source-cell_line'] = cell_line;
+    }
+  }
+  self.source = results;
+  return "'source'";
 };
 
 var populate_conf = function populate_conf(manifest) {
@@ -59,7 +83,7 @@ var populate_conf = function populate_conf(manifest) {
     });
   }
   var template = require('../resources/manifest_conf_mapping.template.json');
-  return transform(conf_data, template, { paste: paste, summarise_ppms: summarise_ppms })
+  return transform(conf_data, template, { paste: paste, summarise_ppms: summarise_ppms, populate_source_info : populate_source_info })
 };
 
 

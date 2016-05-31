@@ -165,7 +165,6 @@ var parse_cellosaurus = function(filename) {
                     entry.bto = cellosaurus[entry.parent].bto;
                 }
             });
-            console.log(cellosaurus['CHO-GS']);
             resolve(true);
         });
     });

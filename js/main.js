@@ -58,7 +58,7 @@ if (sources && ! Array.isArray(sources)) {
 
 var manifest = nconf.get('manifest');
 
-var metadata_ready = Promise.resolve(true);
+var manifiest_parsing_done = Promise.resolve(true);
 
 if (manifest) {
     files_to_open = [];
@@ -66,21 +66,21 @@ if (manifest) {
 
     // Read .tsv or .xls file with
     // data on the manifest contents to build the output files
-
-    var conf_data = require('../js/manifests').populateConf(manifest);
-    nconf.use('metadata', { type: 'literal', store: conf_data });
-    files_to_open = nconf.get('input_files');
-    sources = nconf.get('input_sources');
-    console.log(conf_data);
-    metadata_ready = require('../js/uniprot').cellosaurus.init();
+    manifiest_parsing_done =  require('../js/uniprot').cellosaurus.init().then(function() {
+        var conf_data = require('../js/manifests').populateConf(manifest);
+        nconf.use('metadata', { type: 'literal', store: conf_data });
+        files_to_open = nconf.get('input_files');
+        sources = nconf.get('input_sources');
+        console.log(conf_data);
+    });
 }
 
 // Group files by source
 // Check for the ETD parent mass + RT + scan in all the files
 
-metadata_ready.then(function() { return processor.process(files_to_open,sources); })
-              .then(function(blocks) { return processor.combine(blocks,sources); })
-              .then(function(combined) {
+manifiest_parsing_done.then(function() { return processor.process(files_to_open,sources); })
+                     .then(function(blocks) { return processor.combine(blocks,sources); })
+                     .then(function(combined) {
     // console.log(combined);
     if (nconf.get('output')) {
         fs.writeFile(nconf.get('output')+'.json',JSON.stringify(combined),function() {
