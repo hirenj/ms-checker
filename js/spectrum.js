@@ -128,8 +128,11 @@ var parse_spectrum = function(readStream) {
 
     var in_scan_event = false;
     var in_peak_centroids = false;
+    var in_activation_energies = false;
+
     var spectrum_object = {};
     spectrum_object.peaks = [];
+    spectrum_object.activation_energies = [];
 
     var result = new Promise(function(resolve,reject) {
         readStream.on('end', function() {
@@ -149,6 +152,15 @@ var parse_spectrum = function(readStream) {
             }
             if (! spectrum_object.activation && in_scan_event && line.indexOf('ActivationTypes') >= 0 ) {
                 spectrum_object.activation = line.match(/>(.+)</)[1];
+            }
+            if (line == '<ActivationEnergies>') {
+                in_activation_energies = true;
+            }
+            if (line == '</ActivationEnergies>') {
+                in_activation_energies = false;
+            }
+            if (in_activation_energies && line.indexOf('double') >= 0) {
+                spectrum_object.activation_energies.push(parseFloat(line.replace( /<\/?double>/g,'').trim()));
             }
             if (line == '<PeakCentroids>') {
                 in_peak_centroids = true;

@@ -272,7 +272,7 @@ var process_data = function(filename,sibling_files,source) {
           var done_accumulating = hexnac_hcd.accumulate_peaks();
           var output_filename = filename.split('/').reverse()[0].replace('\.msf','')+"-oxonium.txt";
           processing_promise.then(function() {
-            fs.appendFile(output_filename, done_accumulating().map(function(peak) { return peak.join("\t"); }).join("\n"), function (err) {});
+            fs.writeFile(output_filename, [[ "peptide-spectrumid-activation", "theoretical", "actual", "intensity" ]].concat(done_accumulating()).map(function(peak) { return peak.join("\t"); }).join("\n"), function (err) {});
           });
         }
 

@@ -271,7 +271,7 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
 
     var is_core2 = false;
 
-    mass_check_spec_id = pep.Sequence+"-"+pep.SpectrumID;
+    mass_check_spec_id = pep.Sequence+"-"+pep.SpectrumID+"-"+spectrum.activation_energies.join(',');
 
     spectrum.peaks.forEach(function(peak) {
         var mass = peak.mass;
