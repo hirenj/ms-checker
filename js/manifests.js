@@ -1,8 +1,10 @@
+'use strict';
 
 var nconf = require('nconf');
 var xlsx = require('node-xlsx');
 var transform = require('jsonpath-object-transform');
 var cellosaurus = require('./uniprot').cellosaurus;
+var entrez = require('./entrez');
 
 var paste = function(self,sep) {
   var args = Array.prototype.slice.call(arguments);
@@ -55,6 +57,17 @@ var populate_source_info = function(self,organism,tissue,cell_line) {
   return "'source'";
 };
 
+var populate_perturbation_info = function(self,taxid,genes,types) {
+  let result = { 'perturbation-ko': [], 'perturbation-ki': []};
+  genes.forEach(function(gene,idx) {
+    let gene_data = entrez.lookup(taxid,gene)[0];
+    let type = types[idx] == 'KI'? 'perturbation-ki' : 'perturbation-ko';
+    result[type].push({'entrez' : parseInt(gene_data.entrez), 'symbol' : gene_data.name })
+  });
+  self.perturbation = result;
+  return "'perturbation'";
+};
+
 var populate_conf = function populate_conf(manifest) {
   var manifest_data = xlsx.parse(manifest);
   if (manifest_data.length > 0) {
@@ -62,15 +75,15 @@ var populate_conf = function populate_conf(manifest) {
     var current_section = null;
     var current_headers = [];
     manifest_data[0].data.forEach(function(row) {
-      if (row[0].match(/^\[.*\]$/)) {
-        current_section = row[0].replace(/[\]\[]/g,'');
+      if (row[0] && row[0].match(/^\[.*\]$/)) {
+        current_section = row[0].replace(/[\]\[]/g,'').replace(/\s/g,'_');
         conf_data[current_section] = conf_data[current_section] || {};
         return;
       }
       if ( ! current_section ) {
         return;
       }
-      if (row[0].match(/^#/)) {
+      if (row[0] && row[0].match(/^#/)) {
         current_headers = row.map(function(header) { return header.replace('#','').replace(/\s/g,'_'); });
         current_headers.forEach(function(header) {
           conf_data[current_section][header] = [];
@@ -83,7 +96,11 @@ var populate_conf = function populate_conf(manifest) {
     });
   }
   var template = require('../resources/manifest_conf_mapping.template.json');
-  return transform(conf_data, template, { paste: paste, summarise_ppms: summarise_ppms, populate_source_info : populate_source_info })
+  return transform(conf_data, template, { paste: paste,
+                                          summarise_ppms: summarise_ppms,
+                                          populate_source_info: populate_source_info,
+                                          populate_perturbation_info: populate_perturbation_info
+                                        })
 };
 
 

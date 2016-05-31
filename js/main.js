@@ -66,7 +66,7 @@ if (manifest) {
 
     // Read .tsv or .xls file with
     // data on the manifest contents to build the output files
-    manifiest_parsing_done =  require('../js/uniprot').cellosaurus.init().then(function() {
+    manifiest_parsing_done =  Promise.all( [ require('../js/uniprot').cellosaurus.init(), require('../js/entrez').init() ] ).then(function() {
         var conf_data = require('../js/manifests').populateConf(manifest);
         nconf.use('metadata', { type: 'literal', store: conf_data });
         files_to_open = nconf.get('input_files');
