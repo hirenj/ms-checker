@@ -10,6 +10,7 @@
     "clone": "^1.0.2",
     "csv-parse": "^1.1.0",
     "ftp": "^0.3.10",
+    "json-schema": "^0.2.2",
     "jsonpath-object-transform": "hirenj/jsonpath-object-transform",
     "jsonpath-plus": "^0.15.0",
     "multistream": "^2.0.5",

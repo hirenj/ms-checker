@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "id" : "http://glycocode.com/schemas/ms-checker_manifest.1.json",
+  "type": "object",
+  "required" : ["PPM","MSF","Source","Genetic_Perturbations"],
+  "properties": {
+    "PPM": {
+      "type": "object",
+      "required" : ["MSF_pattern","Minimum","Maximum"],
+      "properties" : {
+        "MSF_pattern" : { "type":  "array", "items" : { "type" : "string" }},
+        "Minimum" : { "type" : "array", "items" : { "oneOf": [ { "type" : "string" , "enum" : ["auto"] }, { "type" : "number" } ] }},
+        "Maximum" : { "type" : "array", "items" : { "oneOf": [ { "type" : "string" , "enum" : ["auto"] }, { "type" : "number" } ] }}
+      }
+    },
+    "MSF": {
+      "type": "object",
+      "required" : ["Portion","Column","Enzyme","Filename"],
+      "properties" : {
+        "Portion" : { "type":  "array", "items" : { "type" : "string" }},
+        "Column"  : { "type":  "array", "items" : { "type" : "string" }},
+        "Enzyme" : { "type":  "array", "items" : { "type" : "string" }},
+        "Filename" : { "type":  "array", "items" : { "type" : "string" }}
+      }
+    },
+    "Source": {
+      "type": "object",
+      "required" : ["Cell_line","Organism","Tissue"],
+      "properties" : {
+        "Cell_line" : { "type":  "array", "maxItems": 1, "items" : { "type" : "string" }},
+        "Organism"  : { "type":  "array", "maxItems": 1, "items" : { "type" : "number" }},
+        "Tissue"    : { "type":  "array", "maxItems": 1, "items" : { "type" : "string" }}
+      }
+    },
+    "Genetic_Perturbations": {
+      "type": "object",
+      "required" : ["Gene","Type","Entrez_Gene"],
+      "properties" : {
+        "Gene" : { "type":  "array", "items" : { "type" : "string" }},
+        "Type"  : { "type":  "array", "items" : { "type" : "string", "enum" : ["KI","KO"] }},
+        "Entrez_Gene" : { "type":  "array", "items" : { "type" : "number" }}
+      }
+    }
+  }
+}

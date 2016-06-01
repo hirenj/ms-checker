@@ -5,6 +5,7 @@ var xlsx = require('node-xlsx');
 var transform = require('jsonpath-object-transform');
 var cellosaurus = require('./uniprot').cellosaurus;
 var entrez = require('./entrez');
+var Validator = require('jsonschema').Validator;
 
 var paste = function(self,sep) {
   var args = Array.prototype.slice.call(arguments);
@@ -43,12 +44,12 @@ var populate_source_info = function(self,organism,tissue,cell_line) {
     } else {
       results['source-cell_line'] = cell_meta.names[0];
       results['source-organism'] = cell_meta.taxid;
-      results['source-organism_part'] = cell_meta.bto;
+      results['source-organism_part'] = 'bto:'+cell_meta.bto;
       results['source-cellosaurus_id'] = cell_meta.acc;
     }
   } else {
-    results['source-organism'] = organism;
-    results['source-organism_part'] = tissue;
+    results['source-organism'] = organism[0];
+    results['source-organism_part'] = tissue[0];
     if (cell_line) {
       results['source-cell_line'] = cell_line;
     }
@@ -75,7 +76,7 @@ var populate_conf = function populate_conf(manifest) {
     var current_section = null;
     var current_headers = [];
     manifest_data[0].data.forEach(function(row) {
-      if (row[0] && row[0].match(/^\[.*\]$/)) {
+      if (row[0] && (row[0]+'').match(/^\[.*\]$/)) {
         current_section = row[0].replace(/[\]\[]/g,'').replace(/\s/g,'_');
         conf_data[current_section] = conf_data[current_section] || {};
         return;
@@ -83,7 +84,7 @@ var populate_conf = function populate_conf(manifest) {
       if ( ! current_section ) {
         return;
       }
-      if (row[0] && row[0].match(/^#/)) {
+      if (row[0] && (row[0]+'').match(/^#/)) {
         current_headers = row.map(function(header) { return header.replace('#','').replace(/\s/g,'_'); });
         current_headers.forEach(function(header) {
           conf_data[current_section][header] = [];
@@ -95,7 +96,14 @@ var populate_conf = function populate_conf(manifest) {
       });
     });
   }
-  var template = require('../resources/manifest_conf_mapping.template.json');
+  var manifest_version = conf_data.Manifest.Version[0];
+  var schema = require('../resources/manifests/'+manifest_version+'/schema.json');
+  var template = require('../resources/manifests/'+manifest_version+'/manifest_conf_mapping.template.json');
+  var valid = (new Validator()).validate(conf_data,schema);
+  if ( valid.errors && valid.errors.length > 0 ) {
+    throw new Error(valid.errors);
+  }
+  console.log("Validated manifest");
   return transform(conf_data, template, { paste: paste,
                                           summarise_ppms: summarise_ppms,
                                           populate_source_info: populate_source_info,
