@@ -72,7 +72,7 @@ if (manifest) {
 
         let ki_summary = conf_data['perturbation-ki'].length ? 'KI('+conf_data['perturbation-ki'].map( (ki) => ki.symbol ).join(';')+')' : '';
         let ko_summary = conf_data['perturbation-ko'].length ? 'KO('+conf_data['perturbation-ko'].map( (ko) => ko.symbol ).join(';')+')' : '';
-        let other_perturbation_summary = conf_data['perturbation-other'].length > 0 ? 'Other('+conf_data['perturbation-other'][0]+')' : '';
+        let other_perturbation_summary = conf_data['perturbation-other'].length > 0 ? 'Other('+conf_data['perturbation-other']+')' : '';
         conf_data.output = [    ( conf_data['source-cell_line'] || conf_data['source-organism'] ),
                                 ki_summary, ko_summary, other_perturbation_summary
                             ].filter((val) => val).join('-')+'.msdata';
