@@ -40,6 +40,14 @@
         "Type"  : { "type":  "array", "items" : { "type" : "string", "enum" : ["KI","KO"] }},
         "Entrez_Gene" : { "type":  "array", "items" : { "type" : "number" }}
       }
+    },
+    "Other_Perturbations": {
+      "type": "object",
+      "required" : ["Description"],
+      "properties" : {
+        "Description" : { "type":  "array", "maxItems" : 1, "items" : { "type" : "string" }}
+      }
     }
+
   }
 }

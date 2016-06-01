@@ -46,6 +46,9 @@ var get_sample_metadata = function(metadata) {
     if (nconf.get('perturbation-ki').length) {
         metadata['sample']['ki'] = nconf.get('perturbation-ki').map((ki) => "entrez:"+ki.entrez );
     }
+    if (nconf.get('perturbation-other').length) {
+        metadata['sample']['perturbation-other'] = nconf.get('perturbation-other');
+    }
 };
 
 var get_pd_metadata = function(db,metadata) {
@@ -61,6 +64,14 @@ var get_pd_metadata = function(db,metadata) {
             'name'      : 'Proteome Discoverer',
             'run-date'  : run_date
         });
+    });
+};
+
+var get_ppm_cutoffs = function(metadata) {
+    var conf = nconf.get();
+    metadata['ppm-cuttofs'] = {};
+    Object.keys(conf).filter((key) => key.indexOf('ppm') == 0).forEach(function(key) {
+        metadata['ppm-cuttofs'][key] = conf[key];
     });
 };
 
@@ -115,6 +126,7 @@ var populate_metadata = function(db) {
     get_self_version(metadata),
     get_pd_metadata(db,metadata),
     get_sample_metadata(metadata),
+    get_ppm_cutoffs(metadata),
     contaminants.get_version(metadata),
     get_score_metadata(db,metadata) ] ).then(function() {
         return metadata;
