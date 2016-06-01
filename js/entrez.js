@@ -52,12 +52,12 @@ const parse_files = function(stream) {
 const read_entries = function(stream) {
   let read_promise = Promise.resolve(true);
   try {
-    fs.realpathSync('entrezids.txt');
+    fs.realpathSync(__dirname+'/../entrezids.txt');
   } catch (err) {
     read_promise = parse_files(stream);
   }
   return read_promise.then(function() {
-    let reader = fs.createReadStream('entrezids.txt');
+    let reader = fs.createReadStream(__dirname+'/../entrezids.txt');
     let lineReader = require('readline').createInterface({
       input: reader
     });

@@ -1,3 +1,4 @@
+"use strict";
 
 // Under Node-webkit we need to rebuild the sqlite package
 
@@ -68,10 +69,15 @@ if (manifest) {
     // data on the manifest contents to build the output files
     manifiest_parsing_done =  Promise.all( [ require('../js/uniprot').cellosaurus.init(), require('../js/entrez').init() ] ).then(function() {
         var conf_data = require('../js/manifests').populateConf(manifest);
+
+        let ki_summary = conf_data['perturbation-ki'].length ? 'KI('+conf_data['perturbation-ki'].map( (ki) => ki.symbol ).join(';')+')' : ''
+        let ko_summary = conf_data['perturbation-ko'].length ? 'KO('+conf_data['perturbation-ko'].map( (ko) => ko.symbol ).join(';')+')' : ''
+        conf_data.output = [    ( conf_data['source-cell_line'] || conf_data['source-organism'] ),
+                                ki_summary, ko_summary
+                            ].filter((val) => val).join('-')+'.msdata';
         nconf.use('metadata', { type: 'literal', store: conf_data });
         files_to_open = nconf.get('input_files');
         sources = nconf.get('input_sources');
-        console.log(conf_data);
     });
 }
 

@@ -7,7 +7,7 @@ var read_contaminants = function(done) {
     if ( ! contaminants.empty ) {
         return done();
     }
-    fs.readFile('contaminants.json', 'utf8', function (err, data) {
+    fs.readFile(__dirname+'/../contaminants.json', 'utf8', function (err, data) {
         if (err) throw err; // we'll not consider error handling for now
         var json = JSON.parse(data);
         contaminants = json;
