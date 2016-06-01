@@ -32,6 +32,22 @@ var get_fasta_filenames = function(db,metadata) {
     });
 };
 
+var get_sample_metadata = function(metadata) {
+    metadata['sample'] = {};
+    metadata['sample']['species'] = nconf.get('source-organism');
+    metadata['sample']['tissue'] = nconf.get('source-organism_part');
+    if (nconf.get('source-cell_line')) {
+        metadata['sample']['cell_type'] = nconf.get('source-cell_line');
+        metadata['sample']['cell_type_id'] = 'RRID:'+nconf.get('source-cellosaurus_id');
+    }
+    if (nconf.get('perturbation-ko').length) {
+        metadata['sample']['ko'] = nconf.get('perturbation-ko').map((ko) => "entrez:"+ko.entrez );
+    }
+    if (nconf.get('perturbation-ki').length) {
+        metadata['sample']['ki'] = nconf.get('perturbation-ki').map((ki) => "entrez:"+ki.entrez );
+    }
+};
+
 var get_pd_metadata = function(db,metadata) {
     var version;
     var run_date;
@@ -91,13 +107,14 @@ var get_score_metadata = function(db,metadata) {
 
 var populate_metadata = function(db) {
     var metadata = {
-        'msdata-version' : MSDATA_FORMAT_VERSION 
+        'msdata-version' : MSDATA_FORMAT_VERSION
     };
 
     return Promise.all( [ get_raw_filenames(db,metadata),
     get_fasta_filenames(db,metadata),
     get_self_version(metadata),
     get_pd_metadata(db,metadata),
+    get_sample_metadata(metadata),
     contaminants.get_version(metadata),
     get_score_metadata(db,metadata) ] ).then(function() {
         return metadata;
