@@ -176,6 +176,37 @@ AND peptides.PeptideID in (SELECT distinct PeptideID \
         WHERE ModificationName like "%'+mod_string+'%") \
     )';
 
+const retrieve_other_quants_sql = 'SELECT \
+    peptides.PeptideID, \
+    peptides.UniquePeptideSequenceID, \
+    peptides.SpectrumID, \
+    peptides.Sequence, \
+    PrecursorIonQuanResultsSearchSpectra.QuanResultID, \
+    PrecursorIonQuanResults.QuanChannelID, \
+    PrecursorIonQuanResults.Area, \
+    ScanEvents.ActivationType as ActivationType, \
+    peptides.SearchEngineRank, \
+    SpectrumHeaders.Mass as mass, \
+    SpectrumHeaders.Charge as charge, \
+    ifnull(customdata.quantcount,0) as acceptedquant \
+FROM peptides \
+    LEFT JOIN PrecursorIonQuanResultsSearchSpectra \
+        ON peptides.SpectrumID = PrecursorIonQuanResultsSearchSpectra.SearchSpectrumID \
+    LEFT JOIN SpectrumHeaders USING(SpectrumID) \
+    LEFT JOIN ScanEvents USING(ScanEventID) \
+    LEFT JOIN PrecursorIonQuanResults \
+        ON PrecursorIonQuanResultsSearchSpectra.QuanResultID = PrecursorIonQuanResults.QuanResultID \
+    LEFT JOIN (SELECT PeptideID, count(FieldID) as quantcount FROM CustomDataPeptides \
+                WHERE FieldID in (SELECT FieldID FROM CustomDataFields WHERE DisplayName = "QuanResultID") GROUP BY PeptideID) as customdata \
+        ON peptides.PeptideID = customdata.PeptideID  \
+WHERE peptides.ConfidenceLevel = 3 \
+AND SearchEngineRank <= 1 \
+AND peptides.PeptideID not in (SELECT distinct PeptideID \
+    FROM PeptidesAminoAcidModifications \
+    WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \
+        FROM AminoAcidModifications \
+        WHERE ModificationName like "%'+mod_string+'%") \
+    )';
 
 const MASS_MEDIUM = 32.056407;
 const MASS_LIGHT = 28.0313;
@@ -397,6 +428,23 @@ var retrieve_quantified_peptides = function(db) {
     }).then(function() {
         exports.notify_progress(total_count,total_count);
         return peps;
+    }).then(function(peps) {
+        return retrieve_other_quants(db).then(function(other_peps) {
+            return peps.concat(other_peps);
+        });
+    });
+};
+
+var retrieve_other_quants = function(db) {
+    var peps = [];
+    return db.each(retrieve_other_quants_sql,[],function(err,pep) {
+        if (pep) {
+            pep.acceptedquant = (pep.acceptedquant == 0) ? false : true;
+            pep.quant_only = true;
+            peps.push(pep);
+        }
+    }).then(function() {
+        return peps;
     });
 };
 
@@ -428,7 +476,7 @@ var check_quantified_peptides = function(db,peps) {
     return setup_config.then(function(channel_conf) {
         combined_peps = combine_quantified_peptides(peps,channel_conf);
 
-        var singlet_peps = combined_peps.filter( function(pep) { return pep.QuanChannelID.filter(onlyUnique).length == 1; } );
+        var singlet_peps = combined_peps.filter( function(pep) { return ! pep.quant_only && pep.QuanChannelID.filter(onlyUnique).length == 1; } );
         var total_peps = singlet_peps.length + combined_peps.length;
 
         exports.notify_task('Validating quantified peptides');
