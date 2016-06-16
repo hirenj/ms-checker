@@ -40,13 +40,13 @@ var get_sample_metadata = function(metadata) {
         metadata['sample']['cell_type'] = nconf.get('source-cell_line');
         metadata['sample']['cell_type_id'] = 'RRID:'+nconf.get('source-cellosaurus_id');
     }
-    if (nconf.get('perturbation-ko').length) {
+    if ((nconf.get('perturbation-ko') || '').length) {
         metadata['sample']['ko'] = nconf.get('perturbation-ko').map((ko) => "entrez:"+ko.entrez );
     }
-    if (nconf.get('perturbation-ki').length) {
+    if ((nconf.get('perturbation-ki') || '').length) {
         metadata['sample']['ki'] = nconf.get('perturbation-ki').map((ki) => "entrez:"+ki.entrez );
     }
-    if (nconf.get('perturbation-other').length) {
+    if ((nconf.get('perturbation-other') || '').length) {
         metadata['sample']['perturbation-other'] = nconf.get('perturbation-other');
     }
 };
