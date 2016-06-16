@@ -2,6 +2,8 @@ var util = require('util');
 var peptide_search = require('./peptide.js');
 var nconf = require('nconf');
 
+var modification_key = peptide_search.modification_key;
+
 var mod_string = peptide_search.mod_string;
 
 Math.median = require('../js/math-median').median;
@@ -429,6 +431,9 @@ var retrieve_quantified_peptides = function(db) {
         exports.notify_progress(total_count,total_count);
         return peps;
     }).then(function(peps) {
+        if ( ! nconf.get('extract-quant-areas')) {
+            return peps;
+        }
         return retrieve_other_quants(db).then(function(other_peps) {
             return peps.concat(other_peps);
         });
@@ -451,6 +456,8 @@ var retrieve_other_quants = function(db) {
 var onlyUnique = function(value, index, self) {
     return self.indexOf(value) === index;
 };
+
+var quant_only_peps = [];
 
 var check_quantified_peptides = function(db,peps) {
     var idx = 0;
@@ -492,7 +499,56 @@ var check_quantified_peptides = function(db,peps) {
         peptide_search.cleanup(db);
         exports.notify_progress(total_peps,total_peps);
         return combined_peps;
+    }).then(function(combined_peps) {
+        quant_only_peps = combined_peps.filter(function(pep) { return pep.quant_only; });
+        return combined_peps.filter(function(pep) { return ! pep.quant_only; });
     });
+};
+
+var write_quant_areas = function(peps) {
+    var quants = {};
+    peps.concat(quant_only_peps).forEach(function(pep) {
+        if ( ! pep.QuanResultID ) {
+            return;
+        }
+        if ( ! quants[pep.QuanResultID] ) {
+            quants[pep.QuanResultID] = {'areas' : pep.areas, 'identifiers' : [], 'peps' : [] };
+        }
+        quants[pep.QuanResultID].identifiers.push(pep.Sequence+'-'+(modification_key(pep)||''));
+        quants[pep.QuanResultID].peps.push(pep);
+    });
+    var results = [];
+    Object.keys(quants).forEach(function(qrid) {
+        var areas = quants[qrid].areas;
+        var identifiers = quants[qrid].identifiers.filter(onlyUnique);
+        var wanted_id = null;
+        if (identifiers.length > 1) {
+            if (identifiers.filter(function(id) { return id.indexOf('Hex') < 0; }).length == identifiers.length) {
+                wanted_id =  quants[qrid].peps.sort(function(pepa,pepb) {
+                    if (pepa < pepb) {
+                        return -1;
+                    }
+                    if (pepb > pepa) {
+                        return 1;
+                    }
+                    return 0;
+                })[0].Sequence+'-';
+            } else {
+                identifiers.forEach(function(id) {
+                    if (! wanted_id && id.match(/\d+x/)){
+                        wanted_id = id;
+                    }
+                    if (id.match(/\d+-Hex/)) {
+                        wanted_id = id;
+                    }
+                });
+            }
+        } else {
+            wanted_id = identifiers[0];
+        }
+        results.push([wanted_id,areas.light,areas.medium]);
+    });
+    return results;
 };
 
 var peptide_modifications_cache = {'empty' : true };
@@ -544,12 +600,14 @@ var produce_peptide_modification_data = function(db,pep) {
 };
 
 var init_caches = function(db) {
+    quant_only_peps = [];
     return produce_peptide_modification_data(db,{}).then(function() { return find_dimethyls(db,{'PeptideID': 0}); });
 };
 
 var clear_caches = function() {
     validated_quans_cache = {};
     dimethyl_count_cache = null;
+    quant_only_peps = [];
     peptide_modifications_cache = {'empty' : true };
     exports.modifications_cache = peptide_modifications_cache;
 };
@@ -559,3 +617,4 @@ exports.clear_caches = clear_caches;
 exports.retrieve_quantified_peptides = retrieve_quantified_peptides;
 exports.modifications_cache = peptide_modifications_cache;
 exports.check_quantified_peptides = check_quantified_peptides;
+exports.write_quant_areas = write_quant_areas;

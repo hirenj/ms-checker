@@ -268,6 +268,16 @@ var process_data = function(filename,sibling_files,source) {
           .then(spectra.filter_hcd_with_mods)
           .then(tracker('HCD modification filtering'));
 
+        if (nconf.get('extract-quant-areas')) {
+          var output_filename = filename.split('/').reverse()[0].replace('\.msf','')+"-areas.txt";
+          console.log(output_filename);
+          processing_promise.then(function(peps) {
+            console.log(output_filename);
+            console.log(quantitative.write_quant_areas(peps));
+            fs.writeFileSync(output_filename, [[ "identifier", "light", "medium" ]].concat(quantitative.write_quant_areas(peps)).map(function(area) { return area.join("\t"); }).join("\n"));
+          });
+        }
+
 
         return processing_promise.then(function(peps) {
             tracker('Finished tracking, did not lose')([]);
