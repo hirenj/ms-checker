@@ -30,6 +30,13 @@ FROM SpectrumHeaders \
 WHERE SpectrumID = ?';
 
 
+const retrieve_first_spectrum_sql = 'SELECT \
+    Spectrum, Charge, ScanNumbers as scan, RetentionTime as rt, Mass \
+FROM SpectrumHeaders \
+    LEFT JOIN Spectra USING (UniqueSpectrumID) \
+WHERE SpectrumID = (select SpectrumID from SpectrumHeaders limit 1)';
+
+
 const retrieve_spectrum_from_node_sql = 'SELECT \
     Spectrum, Charge, ScanNumbers as scan, RetentionTime as rt, Mass \
 FROM SpectrumHeaders \
@@ -267,7 +274,11 @@ var get_spectrum = function(db,pep,processing_node,no_cache) {
         if ( typeof processing_node !== 'undefined' && processing_node !== null ) {
             spectrum_promise = db.all(retrieve_spectrum_from_node_sql, [ pep.SpectrumID, processing_node ]);
         } else {
-            spectrum_promise = db.all(retrieve_spectrum_sql, [ pep.SpectrumID ]);
+            if (pep.SpectrumID === 0) {
+                spectrum_promise = db.all(retrieve_first_spectrum_sql,[]);
+            } else {
+                spectrum_promise = db.all(retrieve_spectrum_sql, [ pep.SpectrumID ]);
+            }
         }
     }
     spectrum_caches[cache_id] = spectrum_caches[cache_id] || spectrum_promise.then(function(spectra) {

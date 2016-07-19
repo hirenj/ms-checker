@@ -169,6 +169,23 @@ var decide_spectrum = function(db,pep,spectrum) {
         return search_partner_hcd_in_msfs.bind(self)(spectrum,db,glyco_mass)
                .then(check_galnac_glcnac_ratio.bind(null,pep));
     }
+    if ( ! spectrum.instrument && db.instrument ) {
+        spectrum.instrument = db.instrument;
+    }
+
+    if ( ! spectrum.instrument && ! db.instrument ) {
+        return Promise.all(self.sibling_msfs.map(get_db)).then(function(siblings) {
+            return Promise.all(siblings.map(function(sibling) {
+                return spectra.get_spectrum(sibling,{'SpectrumID' : 0},null,Math.random().toString(36).substring(10)).then(function(spec) {
+                    return spec.instrument;
+                });
+            }));
+        }).then(function(instruments) {
+            db.instrument = instruments.filter(onlyUnique)[0];
+            spectrum.instrument = db.instruments;
+        }).then( () => check_galnac_glcnac_ratio(pep,spectrum));
+    }
+
     return check_galnac_glcnac_ratio(pep,spectrum);
 };
 
