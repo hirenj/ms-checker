@@ -5,6 +5,11 @@ var peptide = require('./peptide');
 var nconf = require('nconf');
 var promisify_sqlite = require('./sqlite-promise');
 
+var OXONIUM_INTENSITIES = {
+    'velos' : 2000,
+    'fusion' : 20000
+};
+
 var HexNAcHCD = function HexNAcHCD() {
 };
 
@@ -52,7 +57,7 @@ var onlyUnique = function(value, index, self) {
     return self.indexOf(value) === index;
 };
 
-var check_mass_test = function(mass,mz,error) {
+var check_mass_test = function(mass,mz,error,intensity) {
     if (! error ) {
         return mz == mass;
     }
@@ -65,6 +70,13 @@ var check_mass_test = function(mass,mz,error) {
 
     return false;
 };
+
+var check_mass_intensity_filter = function(min_intensity,mass,mz,error,intensity) {
+    if (intensity < min_intensity) {
+        return;
+    }
+    return check_mass_test(mass,mz,error,intensity);
+}
 
 var accumulated_peaks = [];
 
@@ -145,6 +157,10 @@ var find_partner_hcd = function(spectrum,glyco_mass,db) {
 
     if (spectrum.instrument && ! db.instrument ) {
         db.instrument = spectrum.instrument;
+    }
+
+    if (nconf.get('hexnac-min-intensity')) {
+        check_mass = check_mass_intensity_filter.bind(null, OXONIUM_INTENSITIES[spectrum.instrument] );
     }
 
     // Normally, we should be able to search for HCD spectra
