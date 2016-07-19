@@ -95,6 +95,9 @@ var find_partner_hcd = function(spectrum,glyco_mass,db) {
         return get_db(db).then(find_partner_hcd.bind(self,spectrum,glyco_mass));
     }
 
+    if (spectrum.instrument && ! db.instrument ) {
+        db.instrument = spectrum.instrument;
+    }
 
     // Normally, we should be able to search for HCD spectra
     // using the MassPeak for each spectrum, which would be
@@ -182,7 +185,7 @@ var decide_spectrum = function(db,pep,spectrum) {
             }));
         }).then(function(instruments) {
             db.instrument = instruments.filter(onlyUnique)[0];
-            spectrum.instrument = db.instruments;
+            spectrum.instrument = db.instrument;
         }).then( () => check_galnac_glcnac_ratio(pep,spectrum));
     }
 
