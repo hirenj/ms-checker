@@ -6,8 +6,8 @@ var nconf = require('nconf');
 var promisify_sqlite = require('./sqlite-promise');
 
 var OXONIUM_INTENSITIES = {
-    'velos' : 2000,
-    'fusion' : 20000
+    'Orbitrap Velos Pro' : 2000,
+    'Orbitrap Fusion' : 20000
 };
 
 var HexNAcHCD = function HexNAcHCD() {
@@ -73,7 +73,7 @@ var check_mass_test = function(mass,mz,error,intensity) {
 
 var check_mass_intensity_filter = function(min_intensity,mass,mz,error,intensity) {
     if (intensity < min_intensity) {
-        return;
+        return false;
     }
     return check_mass_test(mass,mz,error,intensity);
 }
@@ -157,10 +157,6 @@ var find_partner_hcd = function(spectrum,glyco_mass,db) {
 
     if (spectrum.instrument && ! db.instrument ) {
         db.instrument = spectrum.instrument;
-    }
-
-    if (nconf.get('hexnac-min-intensity')) {
-        check_mass = check_mass_intensity_filter.bind(null, OXONIUM_INTENSITIES[spectrum.instrument] );
     }
 
     // Normally, we should be able to search for HCD spectra
@@ -268,6 +264,11 @@ var check_galnac_glcnac_ratio = function(pep,spectrum,partner) {
         });
         return;
     }
+
+    if (nconf.get('feature_enable_hexnac-min-intensity')) {
+        check_mass = check_mass_intensity_filter.bind(null, OXONIUM_INTENSITIES[spectrum.instrument] );
+    }
+
     if ( ! partner ) {
         pep.activation = spectrum.activation;
     }
