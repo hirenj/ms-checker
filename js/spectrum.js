@@ -149,6 +149,9 @@ var parse_spectrum = function(readStream) {
             if (line == '</PeakCentroids>') {
                 in_peak_centroids = false;
             }
+            if (line.match('<InstrumentName>')) {
+                spectrum_object.instrument = line.split(/[<>]/)[2];
+            }
             if (in_peak_centroids && line.indexOf('Peak ') >= 0) {
                 var peak = {};
                 line.split(/\s+/).filter(function(attr) { return attr.indexOf('=') >= 0; }).forEach(function(attr) {
@@ -187,6 +190,7 @@ var parse_spectrum_xml = function(readStream) {
     var saxParser = sax.createStream(true);
     var peak_stream = new saxpath.SaXPath(saxParser, '//PeakCentroids/Peak');
     var activation_stream = new saxpath.SaXPath(saxParser, '/MassSpectrum/ScanEvent/ActivationTypes');
+    var instrument_stream = new saxpath.SaXPath(saxParser, '/MassSpectrum/Header/InstrumentName');
 
     // ActivationType normally is the first thing matched
 
@@ -212,6 +216,14 @@ var parse_spectrum_xml = function(readStream) {
                     charge: parseFloat(result.Peak['$'].Z),
                     sn: parseFloat(result.Peak['$'].SN)
                 });
+            }
+        });
+    });
+
+    instrument_stream.on('match',function(xml) {
+        xml2js.parseString(xml,function(err,result) {
+            if (! err ) {
+                spectrum_object.instrument = result.InstrumentName;
             }
         });
     });
@@ -274,6 +286,12 @@ var get_spectrum = function(db,pep,processing_node,no_cache) {
             spectrum.mass = mass;
             spectrum.scan = scan;
             spectrum.rt = retentionTime;
+            if ( ! db.instrument && spectrum.instrument ) {
+                db.instrument = spectrum.instrument;
+            }
+            if ( ! spectrum.instrument ) {
+                spectrum.instrument = db.instrument;
+            }
             return spectrum;
         });
     });
