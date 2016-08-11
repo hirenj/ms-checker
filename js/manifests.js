@@ -65,8 +65,10 @@ var populate_perturbation_info = function(self,taxid,genes,types) {
     let type = types[idx] == 'KI'? 'perturbation-ki' : 'perturbation-ko';
     result[type].push({'entrez' : parseInt(gene_data.entrez), 'symbol' : gene_data.name })
   });
-  if (self.Other_Perturbations.Description.length > 0) {
+  if (self.Other_Perturbations && self.Other_Perturbations.Description.length > 0) {
     result['perturbation-other'] = self.Other_Perturbations.Description[0];
+  } else {
+    result['perturbation-other'] = [];
   }
   self.perturbation = result;
   return "'perturbation'";
