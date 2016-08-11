@@ -37,12 +37,19 @@ var connect_ftp = function(url) {
 var download_file = function(ftp,path,filename) {
     return new Promise(function(resolve,reject) {
         ftp.get(path, function(err, stream) {
-            if (err) throw err;
-            stream.once('close', function() {
-                ftp.end();
-                resolve([ filename, true ]);
-            });
-            stream.pipe(fs.createWriteStream(filename));
+            if (err) {
+                reject(err);
+            } else {
+                var outstream = fs.createWriteStream(filename);
+                outstream.once('close', function() {
+                    ftp.end();
+                    resolve(filename);
+                });
+                stream.on('error',function(err) {
+                    reject(err);
+                });
+                stream.pipe(outstream);
+            }
         });
     });
 };
@@ -64,6 +71,7 @@ var check_modified = function(timedata,url,filename,grace_period) {
             if ( ((new Date(fsstat.mtime)).getTime()+grace_period) < date.getTime() ) {
                 resolve( download_file( ftp_site, parse_url(url).path, filename ).then(function(filename) {
                     fs.utimesSync(filename, date,date);
+                    return [filename, true] ;
                 }) );
             } else {
                 ftp_site.end();
