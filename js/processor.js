@@ -341,7 +341,7 @@ var combine = function(blocks,sources) {
     });
 
     result.metadata = metadata.combine(result.metadata);
-
+    result.metadata.title = nconf.get('output').replace('.msdata','');
     return contaminants.get_version({}).then(function() {
       contaminants.identifiers.forEach(function(contaminant) {
         if (contaminant in result.data) {

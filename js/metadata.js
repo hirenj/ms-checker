@@ -105,6 +105,12 @@ var get_self_version = function(metadata) {
     });
 };
 
+var get_doi = function(metadata) {
+    if (nconf.get('doi')) {
+        metadata.doi = nconf.get('doi');
+    }
+};
+
 var get_score_metadata = function(db,metadata) {
     var score_name, score_description;
 
@@ -118,7 +124,8 @@ var get_score_metadata = function(db,metadata) {
 
 var populate_metadata = function(db) {
     var metadata = {
-        'msdata-version' : MSDATA_FORMAT_VERSION
+        'msdata-version' : MSDATA_FORMAT_VERSION,
+        'mimetype' : 'application/json+msdata'
     };
 
     return Promise.all( [ get_raw_filenames(db,metadata),
@@ -127,6 +134,7 @@ var populate_metadata = function(db) {
     get_pd_metadata(db,metadata),
     get_sample_metadata(metadata),
     get_ppm_cutoffs(metadata),
+    get_doi(metadata),
     contaminants.get_version(metadata),
     get_score_metadata(db,metadata) ] ).then(function() {
         return metadata;
