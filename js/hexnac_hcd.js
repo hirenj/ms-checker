@@ -44,6 +44,10 @@ const default_error = {ppm: 15};
 
 exports.error = default_error;
 
+var onlyUnique = function(value, index, self) {
+    return self.indexOf(value) === index;
+};
+
 var check_mass = function(mass,mz,error) {
     if (! error ) {
         return mz == mass;
