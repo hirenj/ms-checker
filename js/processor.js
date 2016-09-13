@@ -339,6 +339,9 @@ var combine = function(blocks,sources) {
         });
         result.metadata.push(block.metadata);
     });
+
+    result.metadata = metadata.combine(result.metadata);
+
     return contaminants.get_version({}).then(function() {
       contaminants.identifiers.forEach(function(contaminant) {
         if (contaminant in result.data) {

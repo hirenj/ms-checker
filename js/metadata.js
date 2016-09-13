@@ -133,4 +133,16 @@ var populate_metadata = function(db) {
     });
 };
 
+var combine_metadata = function(metadatas) {
+    return metadatas.reduce(function(result,next) {
+        if ( ! result ) {
+            return next;
+        }
+        result['ms_run-location'] = result['ms_run-location'].concat(next['ms_run-location']);
+    });
+};
+
+
 exports.get_metadata = populate_metadata;
+
+exports.combine = combine_metadata;
