@@ -346,7 +346,7 @@ var combine_all_peptides = function(peps) {
                     quant_intensity.max = pep.quant_intensity_range[1];
                 }
             }
-            spectra.push( {'score' : pep.score, 'rt' : pep.retentionTime, 'scan' : pep.scan, 'ppm' : pep.ppm, 'mass' : pep.mass , 'charge' : pep.charge } );
+            spectra.push( {'score' : parseFloat(pep.score.toFixed(2)), 'rt' : parseFloat(pep.retentionTime.toFixed(2)), 'scan' : pep.scan, 'ppm' : parseFloat(pep.ppm.toFixed(2)), 'mass' : parseFloat(pep.mass.toFixed(2)) , 'charge' : pep.charge } );
             activations.push( pep.activation );
         });
 
@@ -408,7 +408,9 @@ var combine_all_peptides = function(peps) {
 
         block.spectra = spectra;
         block.activation = activations.filter(onlyUnique);
-        block.quant_areas = areas;
+        if (block.quant) {
+            block.quant_areas = areas;
+        }
 
         if (has_possible_mods) {
             block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) {
