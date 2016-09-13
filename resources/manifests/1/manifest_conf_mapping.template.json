@@ -1,6 +1,7 @@
 {
 	"input_files" : "$.MSF.Filename",
 	"input_sources" : "$.MSF[(paste( @ ,'_','Portion','Column','Enzyme'))]",
+	"doi" : "$.Publication.DOI[0]",
 	"source.*" : "$.Source[(populate_source_info(@, @.Organism, @.Tissue, @.Cell_line[0] ))]",
 	"perturbation.*": "$[(populate_perturbation_info(@, @.Source.source['source-organism'], @.Genetic_Perturbations.Gene, @.Genetic_Perturbations.Type))]",
 	"ppm.*" : "$[(summarise_ppms( @ , @.PPM, @.MSF.pasted, @.MSF.Filename ))]"
