@@ -361,7 +361,6 @@ var combine_all_peptides = function(peps) {
         }
 
         var block = {
-            'multi_protein' : null,
             'sequence' : first_pep.Sequence
         };
 
