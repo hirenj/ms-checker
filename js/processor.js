@@ -6,7 +6,7 @@ var ProgressBar = require('progress');
 
 Math.median = require('../js/math-median').median;
 
-var uniprot_meta = require('../js/uniprot.js');
+var uniprot_meta = require('../js/uniprot.js').uniprot;
 
 var promisify_sqlite = require('../js/sqlite-promise');
 

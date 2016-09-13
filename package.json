@@ -8,7 +8,12 @@
   "dependencies": {
     "byline": "^4.2.1",
     "clone": "^1.0.2",
+    "csv-parse": "^1.1.0",
     "ftp": "^0.3.10",
+    "json-schema": "^0.2.2",
+    "jsonpath-object-transform": "hirenj/jsonpath-object-transform",
+    "jsonpath-plus": "^0.15.0",
+    "multistream": "^2.0.5",
     "nconf": "^0.7.1",
     "node-xlsx": "^0.5.1",
     "optimist": "^0.6.1",
@@ -16,6 +21,7 @@
     "sax": "^0.6.1",
     "saxpath": "^0.6.1",
     "sqlite3": "^3.0.5",
+    "stream-transform": "^0.1.1",
     "xlsx-style": "^0.8.6",
     "xml2js": "^0.4.6",
     "yauzl": "^2.2.1"

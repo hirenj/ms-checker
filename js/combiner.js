@@ -1,5 +1,5 @@
 var peptide = require('./peptide');
-var uniprot_meta = require('./uniprot');
+var uniprot_meta = require('./uniprot').uniprot;
 var nconf = require('nconf');
 var quantitative = require('./quantitative');
 
