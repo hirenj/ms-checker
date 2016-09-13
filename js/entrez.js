@@ -96,7 +96,13 @@ EntrezMeta.prototype.init = function() {
     return Promise.all(promises).then(function(filenames) {
       metadata = {};
       if (filenames.map(function(file) { return file[1]; }).indexOf(true) >= 0) {
-        fs.unlinkSync('entrezids.txt');
+        try {
+          fs.unlinkSync('entrezids.txt');
+        } catch (err) {
+          if (err.errno !== -2) {
+            throw err;
+          }
+        }
       }
       return MultiStream(filenames.map(function(file) { return file[0]; }).map(get_stream));
     }).then(read_entries);
