@@ -373,6 +373,7 @@ var combine_all_peptides = function(peps) {
 
         if (quant !== null) {
             block.quant = isNaN(parseInt(quant)) ? {'quant' : quant } : {'quant' : quant, 'mad' : first_pep.CalculatedRatio_mad };
+            block.quant.channels = quantitative.ko_channel[0].toUpperCase()+':'+quantitative.wt_channel[0].toUpperCase();
             if (is_singlet) {
                 block.quant.singlet_confidence = confident_singlet ? 'high' : 'low';
                 if ( ! high_sn ) {
