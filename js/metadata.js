@@ -147,6 +147,7 @@ var combine_metadata = function(metadatas) {
             return next;
         }
         result['ms_run-location'] = result['ms_run-location'].concat(next['ms_run-location']);
+        return result;
     });
 };
 
