@@ -35,6 +35,28 @@ var summarise_ppms = function(self,ppm,sources,filenames) {
   return "'parsed_ppm'";
 };
 
+var summarise_quants = function(self,channels,identifiers) {
+  var results = {};
+  console.log(arguments);
+  channels.forEach(function(channel,i) {
+    results[ "quant-channel-"+channel ] = identifiers[i];
+  });
+  self.parsed_quants = results;
+  console.log(results);
+  return "'parsed_quants'";
+};
+
+
+var summarise_flags = function(self) {
+  var results = {};
+  self.Flags.Flag.forEach(function(flag,i) {
+    results[ flag ] = self.Flags.Value[i];
+  });
+  self.flags = results;
+  console.log(results);
+  return "'flags'";
+};
+
 var populate_source_info = function(self,organism,tissue,cell_line) {
   var results = {};
   var cell_meta;
@@ -111,6 +133,8 @@ var populate_conf = function populate_conf(manifest) {
   console.log("Validated manifest");
   return transform(conf_data, template, { paste: paste,
                                           summarise_ppms: summarise_ppms,
+                                          summarise_quants : summarise_quants,
+                                          summarise_flags : summarise_flags,
                                           populate_source_info: populate_source_info,
                                           populate_perturbation_info: populate_perturbation_info
                                         })
