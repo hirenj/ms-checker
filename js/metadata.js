@@ -87,6 +87,20 @@ var write_feature_flags = function() {
     return results.join(',');
 };
 
+var get_quant_conf = function(metadata) {
+    var opts = nconf.get();
+    var results = { };
+    Object.keys(opts).forEach(function(flag) {
+        if (flag.match('quant-channel-')) {
+            results[flag.split('-')[2]] = opts[flag];
+        }
+    });
+    if (Object.keys(results).length > 0) {
+        metadata.quantitation = { 'channels' : results };
+    }
+};
+
+
 var get_self_version = function(metadata) {
     return new Promise(function(resolve,reject) {
 
@@ -135,6 +149,7 @@ var populate_metadata = function(db) {
     get_sample_metadata(metadata),
     get_ppm_cutoffs(metadata),
     get_doi(metadata),
+    get_quant_conf(metadata),
     contaminants.get_version(metadata),
     get_score_metadata(db,metadata) ] ).then(function() {
         return metadata;
