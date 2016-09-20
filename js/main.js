@@ -43,6 +43,17 @@ var processor = require('../js/processor');
 
 var excel_writer = require('../js/excel');
 
+let pretty_print = function(data,depth) {
+  let tab_size = 2;
+  let indent = Array(tab_size+1).join(' ');
+  let output = JSON.stringify(data,null,indent);
+  let start_re = new RegExp('\n {'+(depth+1)*tab_size+',}','gm');
+  let end_re = new RegExp('([\\"\\}\\]])\\n {'+(depth*tab_size)+'}','gm');
+  return output.replace(start_re,'').replace(end_re,'$1');
+};
+
+
+
 var files_to_open = nconf.get('_') || [];
 
 if (gui) {
@@ -90,7 +101,7 @@ manifiest_parsing_done.then(function() { return processor.process(files_to_open,
                      .then(function(combined) {
     // console.log(combined);
     if (nconf.get('output')) {
-        fs.writeFile(nconf.get('output')+'.json',JSON.stringify(combined),function() {
+        fs.writeFile(nconf.get('output')+'.json',pretty_print(combined,2),function() {
             console.log("Wrote combined file");
         });
         excel_writer.write(combined,nconf.get('output')+'.xlsx').catch(console.log.bind(console));
