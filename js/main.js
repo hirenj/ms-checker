@@ -17,6 +17,7 @@ try {
 var nconf = require('nconf');
 
 var fs = require('fs');
+var path = require('path');
 
 if (gui) {
     nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).add('metadata', { type: 'literal', store: {} }).overrides( require('optimist')(gui.App.argv).argv );
@@ -88,7 +89,7 @@ if (manifest) {
                                 ki_summary, ko_summary, other_perturbation_summary
                             ].filter((val) => val).join('-')+'.msdata';
         nconf.use('metadata', { type: 'literal', store: conf_data });
-        files_to_open = nconf.get('input_files');
+        files_to_open = nconf.get('input_files').map( (file) =>  path.join(path.dirname(manifest),file) );
         sources = nconf.get('input_sources');
     });
 }
@@ -100,7 +101,18 @@ manifiest_parsing_done.then(function() { return processor.process(files_to_open,
                      .then(function(blocks) { return processor.combine(blocks,sources); })
                      .then(function(combined) {
     // console.log(combined);
+    if (nconf.get('outputdir') && nconf.get('output')) {
+        nconf.set('output', path.join(nconf.get('outputdir'),nconf.get('output')));
+    }
     if (nconf.get('output')) {
+        let existing = '';
+        try {
+            if (existing = fs.readFileSync(nconf.get('output')+'.json') && nconf.get('manifest')) {
+                console.log("Merging existing data for manifest ",nconf.get('manifest'));
+                merge_datas(combined.data,JSON.parse(existing).data);
+            }
+        } catch (err) {
+        }
         fs.writeFile(nconf.get('output')+'.json',pretty_print(combined,2),function() {
             console.log("Wrote combined file");
         });

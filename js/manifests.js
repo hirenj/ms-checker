@@ -37,23 +37,22 @@ var summarise_ppms = function(self,ppm,sources,filenames) {
 
 var summarise_quants = function(self,channels,identifiers) {
   var results = {};
-  console.log(arguments);
   channels.forEach(function(channel,i) {
     results[ "quant-channel-"+channel ] = identifiers[i];
   });
   self.parsed_quants = results;
-  console.log(results);
   return "'parsed_quants'";
 };
 
 
 var summarise_flags = function(self) {
   var results = {};
-  self.Flags.Flag.forEach(function(flag,i) {
-    results[ flag ] = self.Flags.Value[i];
-  });
+  if (self.Flags) {
+    self.Flags.Flag.forEach(function(flag,i) {
+      results[ flag ] = self.Flags.Value[i];
+    });
+  }
   self.flags = results;
-  console.log(results);
   return "'flags'";
 };
 
