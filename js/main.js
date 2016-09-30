@@ -40,10 +40,6 @@ if (gui) {
     nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
 }
 
-var processor = require('../js/processor');
-
-var excel_writer = require('../js/excel');
-
 let pretty_print = function(data,depth) {
   let tab_size = 2;
   let indent = Array(tab_size+1).join(' ');
@@ -94,29 +90,47 @@ if (manifest) {
     });
 }
 
+var processor;
+var excel_writer = require('../js/excel');
+
+var merge_datas = function(current,data) {
+    Object.keys(data).forEach(function(up) {
+        if ( ! current[up]) {
+            current[up] = data[up];
+        } else {
+            current[up] = current[up].concat(data[up]);
+        }
+    });
+};
+
 // Group files by source
 // Check for the ETD parent mass + RT + scan in all the files
 
-manifiest_parsing_done.then(function() { return processor.process(files_to_open,sources); })
+manifiest_parsing_done
+                     .then(function() { processor = require('../js/processor'); })
+                     .then(function() { return processor.process(files_to_open,sources); })
                      .then(function(blocks) { return processor.combine(blocks,sources); })
                      .then(function(combined) {
+
     // console.log(combined);
-    if (nconf.get('outputdir') && nconf.get('output')) {
-        nconf.set('output', path.join(nconf.get('outputdir'),nconf.get('output')));
+    let outpath = nconf.get('output');
+    if (nconf.get('outputdir') && outpath) {
+        outpath = path.join(nconf.get('outputdir'),nconf.get('output'));
     }
-    if (nconf.get('output')) {
+    if (outpath) {
         let existing = '';
         try {
-            if (existing = fs.readFileSync(nconf.get('output')+'.json') && nconf.get('manifest')) {
+            if ((existing = fs.readFileSync(outpath+'.json')) && nconf.get('manifest')) {
                 console.log("Merging existing data for manifest ",nconf.get('manifest'));
                 merge_datas(combined.data,JSON.parse(existing).data);
             }
         } catch (err) {
+            console.log(err);
         }
-        fs.writeFile(nconf.get('output')+'.json',pretty_print(combined,2),function() {
+        fs.writeFile(outpath+'.json',pretty_print(combined,2),function() {
             console.log("Wrote combined file");
         });
-        excel_writer.write(combined,nconf.get('output')+'.xlsx').catch(console.log.bind(console));
+        excel_writer.write(combined,outpath+'.xlsx').catch(console.log.bind(console));
     }
 }).catch(function(err) {
     console.error(err);
