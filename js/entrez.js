@@ -43,7 +43,7 @@ const parse_files = function(stream) {
       callback(null, [key,taxid,geneid,genename].join('\t')+'\n');
     }, 0);
   }, {parallel: 100});
-  var stream_pipe = stream.pipe(parser).pipe(transformer).pipe(fs.createWriteStream('entrezids.txt'));
+  var stream_pipe = stream.pipe(parser).pipe(transformer).pipe(fs.createWriteStream(__dirname+'/../entrezids.txt'));
   return new Promise(function(resolve,reject) {
     stream_pipe.on('end',resolve);
   });
@@ -97,7 +97,7 @@ EntrezMeta.prototype.init = function() {
       metadata = {};
       if (filenames.map(function(file) { return file[1]; }).indexOf(true) >= 0) {
         try {
-          fs.unlinkSync('entrezids.txt');
+          fs.unlinkSync(__dirname+'/../entrezids.txt');
         } catch (err) {
           if (err.errno !== -2) {
             throw err;
