@@ -213,6 +213,15 @@ var tracker = function(label) {
       return peps;
     });
   }
+  if (nconf.get('track-peptide-count')) {
+    return (function(peps) {
+      if (peps.length === 0 && ! tracker_labels['any_peptides']) {
+        console.log("No peptides left at ",label);
+        tracker_labels['any_peptides'] = true;
+      }
+      return peps;
+    });
+  }
   return function(peps) { return peps; }
 };
 

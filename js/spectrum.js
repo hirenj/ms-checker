@@ -330,9 +330,13 @@ var get_related_spectra = function(db,spectrum) {
 };
 
 var filter_hcd_with_mods = function(peps) {
+    var activation_types = peps.map( pep => pep.activation).filter( (value,index,self) => self.indexOf(value) === index );
     peps = peps.filter(function(pep) {
         return (pep.activation !== 'HCD' && pep.activation !== 'CID') || ! pep.modifications;
     });
+    if (peps.length === 0 && activation_types.length > 0) {
+        console.log("Filtered out all peptides, is there a problem with activation types ",activation_types);
+    }
     return peps;
 };
 
