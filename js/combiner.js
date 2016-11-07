@@ -1,3 +1,5 @@
+"use strict";
+
 var peptide = require('./peptide');
 var uniprot_meta = require('./uniprot').uniprot;
 var nconf = require('nconf');
@@ -420,6 +422,12 @@ var combine_all_peptides = function(peps) {
                 rescale_ids(pep.pep_start, first_pep.pep_start, temp_block);
                 return temp_block.ambiguous_mods[0];
             }).filter(onlyUnique);
+            block.sites = block.ambiguous_mods[0].split(',').filter((mod) => mod.indexOf('-') < 0).map((mod) => { let mod_bits = mod.split(/[\(\)]/).slice(0,2); mod_bits[0] = +mod_bits[0]; return mod_bits; });
+            block.ambiguous_sites = consolidate_ambiguous_compositions(block.ambiguous_mods[0].split(',').filter((mod) => mod.indexOf('-') > 0));
+
+            delete block.ambiguous_mods;
+
+
             block.made_ambiguous = '';
 
             var ambig_reasons = peps.filter(function(pep) { return "made_ambiguous" in pep; }).map(function(pep) { return pep.made_ambiguous == true ? 'missing_site_coverage' : pep.made_ambiguous; });
@@ -477,6 +485,22 @@ var rescale_ids = function(old,new_pos,peptide) {
     peptide.peptide_start = new_pos + 1;
 }
 
+var consolidate_ambiguous_compositions = function(sites) {
+    let site_counts = {};
+    let all_sites = [];
+    sites.forEach( site => {
+        site_counts[site] = (site_counts[site] || 0) + 1;
+        all_sites.push(site);
+    });
+    return all_sites.filter(onlyUnique).map( mod => {
+        let mod_bits = mod.split(/[\(\)]/).slice(0,2);
+        let range_ends = mod_bits[0].split('-').map( end => +end );
+        if (site_counts[mod] > 1) {
+            mod_bits[1] = site_counts[mod] + 'x' + mod_bits[1];
+        }
+        return [ range_ends, mod_bits[1] ];
+    });
+};
 
 var write_possible_mods = function(mods) {
     var mod_compositions = {};
