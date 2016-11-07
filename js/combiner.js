@@ -98,7 +98,7 @@ var combine_all_peptides = function(peps) {
         // it's a non-unique identification, so we should just use the
         // composition
 
-        var mods = peps.filter(not_hcd_filter).map(function(pep) { return peptide.modification_key(pep); }).filter(onlyUnique).filter(function(key) { return key.indexOf('-') >= 0; });
+        var mods = peps.filter(not_hcd_filter).filter( (pep) => ! pep.made_ambiguous ).map(function(pep) { return peptide.modification_key(pep); }).filter(onlyUnique).filter(function(key) { return key.indexOf('-') >= 0; });
 
         peps.forEach(function(pep) {
             if (mods.length > 1 || pep.activation == 'HCD' || pep.activation == 'CID') {

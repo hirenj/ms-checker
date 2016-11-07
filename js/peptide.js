@@ -403,12 +403,36 @@ var extract_composition = function(mods) {
     return Object.keys(compositions).map(function(comp) {  return compositions[comp]+"x"+comp; }).sort();
 };
 
+var write_possible_mods = function(mods) {
+    var mod_compositions = {};
+    return mods.sort(function(a,b) {
+        var sort_val_a = a[3] ? a[3] : a[0];
+        var sort_val_b = b[3] ? b[3] : b[0];
+        if (sort_val_a == sort_val_b) {
+            sort_val_a = a[4] ? a[4] : a[0];
+            sort_val_b = b[4] ? b[4] : b[0];
+        }
+        return sort_val_a - sort_val_b;
+    }).map(function(mod) {
+        if (mod[3]) {
+            if (mod[3] == mod[4]) {
+                return ""+mod[3]+"-"+mod[1];
+            }
+            return ""+mod[3]+":"+mod[4]+"-"+mod[1];
+        }
+        return mod[0]+"-"+mod[1];
+    }).join(',');
+};
+
+
 var modification_key = function(pep) {
     var mod_key = null;
     if (pep.modifications) {
         mod_key = pep.modifications.sort(function(a,b) { return a[0] - b[0]; }).map(function(mod) {  return mod[0]+"-"+mod[1]; }).join(',');
     }
-    if (pep.Composition) {
+    if (pep.possible_mods) {
+        mod_key = write_possible_mods(pep.possible_mods);
+    } else if (pep.Composition) {
         mod_key = pep.Composition.sort().join(',');
     }
     return mod_key;
