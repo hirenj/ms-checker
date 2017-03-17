@@ -3,6 +3,7 @@
 const util = require('util');
 const get_cached_file = require('./ftp').get_cached_file;
 const fs = require('fs');
+const path = require('path');
 const zlib = require('zlib');
 const MultiStream = require('multistream');
 
@@ -43,7 +44,7 @@ const parse_files = function(stream) {
       callback(null, [key,taxid,geneid,genename].join('\t')+'\n');
     }, 0);
   }, {parallel: 100});
-  var stream_pipe = stream.pipe(parser).pipe(transformer).pipe(fs.createWriteStream(__dirname+'/../entrezids.txt'));
+  var stream_pipe = stream.pipe(parser).pipe(transformer).pipe(fs.createWriteStream(path.join(__dirname,'../entrezids.txt')));
   return new Promise(function(resolve,reject) {
     stream_pipe.on('end',resolve);
   });
@@ -52,12 +53,12 @@ const parse_files = function(stream) {
 const read_entries = function(stream) {
   let read_promise = Promise.resolve(true);
   try {
-    fs.realpathSync(__dirname+'/../entrezids.txt');
+    fs.realpathSync(path.join(__dirname,'../entrezids.txt'));
   } catch (err) {
     read_promise = parse_files(stream);
   }
   return read_promise.then(function() {
-    let reader = fs.createReadStream(__dirname+'/../entrezids.txt');
+    let reader = fs.createReadStream(path.join(__dirname,'../entrezids.txt'));
     let lineReader = require('readline').createInterface({
       input: reader
     });
@@ -89,7 +90,7 @@ EntrezMeta.prototype.init = function() {
     if (metadata) {
         return Promise.resolve(true);
     }
-    console.log("Initing Entrez data");
+    console.log("Initing Entrez data into ",path.join(__dirname,'../entrezids.txt'));
     let promises = Object.keys(GENE_URLS).map(function(organism) {
       return get_cached_file( GENE_URLS[organism],"entrez."+organism+".gene_info.gz", 1000*60*60*24*28 );
     });

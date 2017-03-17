@@ -40,6 +40,9 @@ var get_sample_metadata = function(metadata) {
         metadata['sample']['cell_type'] = nconf.get('source-cell_line');
         metadata['sample']['cell_type_id'] = 'RRID:'+nconf.get('source-cellosaurus_id');
     }
+    if (nconf.get('perturbation-wt')) {
+        metadata['sample']['wt'] = nconf.get('perturbation-wt').map((ko) => "entrez:"+ko.entrez );
+    }
     if ((nconf.get('perturbation-ko') || '').length) {
         metadata['sample']['ko'] = nconf.get('perturbation-ko').map((ko) => "entrez:"+ko.entrez );
     }

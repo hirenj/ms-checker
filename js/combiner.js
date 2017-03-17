@@ -127,11 +127,11 @@ var combine_all_peptides = function(peps) {
     peptides_by_spectrum = null;
 
     var grouped_peptides = {};
-    peps.forEach(function(pep) {
+    peps.forEach(function(pep,idx) {
 
         check_single_site(pep);
 
-        var pep_key = pep.Sequence+"-"+peptide.modification_key(pep);
+        var pep_key = pep.Sequence+"-"+peptide.modification_key(pep)+(pep.QuanResultID || idx);
         var current_uniprots = [];
         var current_starts = [];
 
@@ -297,7 +297,7 @@ var combine_all_peptides = function(peps) {
             }
             if (pep.acceptedquant && "has_pair" in pep && pep.has_pair === true && pep.used && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
                 // Potential ratio 1/100000 in the potential_light
-                // Potential ratio 100000 in the potential_medium 
+                // Potential ratio 100000 in the potential_medium
                 quant = pep.QuanChannelID[0] == quantitative.wt_channel ? 'potential_wt' : 'potential_ko';
             }
 
@@ -363,7 +363,8 @@ var combine_all_peptides = function(peps) {
         }
 
         var block = {
-            'sequence' : first_pep.Sequence
+            'sequence' : first_pep.Sequence,
+            'annotations' : {}
         };
 
         if (first_pep.uniprot.length > 1) {
@@ -374,7 +375,7 @@ var combine_all_peptides = function(peps) {
         }
 
         if (quant !== null) {
-            block.quant = isNaN(parseInt(quant)) ? {'quant' : quant } : {'quant' : quant, 'mad' : first_pep.CalculatedRatio_mad };
+            block.quant = isNaN(parseInt(quant)) ? {'quant' : quant } : {'quant' : +quant.toFixed(3), 'mad' : first_pep.CalculatedRatio_mad };
             block.quant.channels = quantitative.ko_channel[0].toUpperCase()+':'+quantitative.wt_channel[0].toUpperCase();
             if (is_singlet) {
                 block.quant.singlet_confidence = confident_singlet ? 'high' : 'low';
@@ -388,8 +389,8 @@ var combine_all_peptides = function(peps) {
             block.quant = {'quant' : "rejected_"+unaccepted_quant };
         }
         if (Object.keys(hexnac_type).length > 0) {
-            block.hexnac_type = Object.keys(hexnac_type).sort();
-            block.hexnac_ratio = hexnac_ratios.join(',');
+            block.annotations[ 'hexnac_calls' ] = Object.keys(hexnac_type).sort();
+            block.annotations[ 'hexnac_ratios' ] = hexnac_ratios.join(',');
         }
 
         if (nconf.get('feature_enable_nglyco')) {
@@ -412,7 +413,7 @@ var combine_all_peptides = function(peps) {
         block.spectra = spectra;
         block.activation = activations.filter(onlyUnique);
         if (block.quant) {
-            block.quant_areas = areas;
+            block.quant.areas = {'M' : areas.medium[0], 'L' : areas.light[0] };
         }
 
         if (has_possible_mods) {

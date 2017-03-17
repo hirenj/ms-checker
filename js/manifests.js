@@ -80,10 +80,13 @@ var populate_source_info = function(self,organism,tissue,cell_line) {
 };
 
 var populate_perturbation_info = function(self,taxid,genes,types) {
-  let result = { 'perturbation-ko': [], 'perturbation-ki': []};
+  let result = { 'perturbation-ko': [], 'perturbation-ki': [] };
   genes.forEach(function(gene,idx) {
     let gene_data = entrez.lookup(taxid,gene)[0];
-    let type = types[idx] == 'KI'? 'perturbation-ki' : 'perturbation-ko';
+    let type = 'perturbation-'+types[idx].toLowerCase();
+    if ( ! result[type] ) {
+      result[type] = [];
+    }
     result[type].push({'entrez' : parseInt(gene_data.entrez), 'symbol' : gene_data.name })
   });
   if (self.Other_Perturbations && self.Other_Perturbations.Description.length > 0) {

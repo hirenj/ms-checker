@@ -133,6 +133,7 @@ manifiest_parsing_done
         excel_writer.write(combined,outpath+'.xlsx').catch(console.log.bind(console));
     }
 }).catch(function(err) {
+    console.error(nconf.get('input_files'));
     console.error(err);
     console.error(err.stack);
 });
