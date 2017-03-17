@@ -19,8 +19,8 @@ module.exports = function(grunt) {
         },
         curl: {
             contaminants: {
-                src: 'http://maxquant.org/contaminants.zip',
-                dest: 'tmp/contaminants.zip'
+                src: 'http://lotus1.gwdg.de/mpg/mmbc/maxquant_input.nsf/7994124a4298328fc125748d0048fee2/$FILE/contaminants.fasta',
+                dest: 'tmp/contaminants.fasta'
             }
         },
         unzip: {
@@ -59,7 +59,7 @@ module.exports = function(grunt) {
             grunt.config.set('contaminants.updated', new Date(response.headers['last-modified']).toISOString().slice(0,10));
             grunt.config.set('contaminants.retrieved', new Date(response.headers['date']).toISOString().slice(0,10));
         });
-        grunt.task.run('curl:contaminants','unzip:contaminants');
+        grunt.task.run('curl:contaminants');
     });
 
     grunt.registerTask('parse-contaminants',"Parse contaminants list", function() {
