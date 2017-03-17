@@ -5,40 +5,19 @@
 // NODE_WEBKIT_VERSION="0.12.0"
 // npm install sqlite3 --build-from-source --runtime=node-webkit --target_arch=x64 --target=$NODE_WEBKIT_VERSION
 
-var gui = null;
-
-try {
-    // Load native UI library
-    gui = require('nw.gui');
-} catch(e) {
-    console.log("No GUI available");
-}
-
 var nconf = require('nconf');
+
 
 var fs = require('fs');
 var path = require('path');
 
-if (gui) {
-    nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).add('metadata', { type: 'literal', store: {} }).overrides( require('optimist')(gui.App.argv).argv );
+nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
 
-    if (nconf.get('MS_DEBUG') || nconf.get('debug')) {
-        gui.Window.get().showDevTools();
-    }
-
-    (function() {
-        var win = gui.Window.get();
-        var nativeMenuBar = new gui.Menu({ type: "menubar" });
-        try {
-            nativeMenuBar.createMacBuiltin("My App");
-            win.menu = nativeMenuBar;
-        } catch (ex) {
-            console.log(ex.message);
-        }
-    })();
-} else {
-    nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
+if (nconf.get('help') || ! nconf.get('manifest') || ! nconf.get('_')) {
+    console.log("ms-checker --manifest manifestfile.xlsx --outputdir output ..OR.. ms-checker --source somesource path/to/file.msf --output outputfile ");
+    process.exit(1);
 }
+
 
 let pretty_print = function(data,depth) {
   let tab_size = 2;
@@ -52,12 +31,6 @@ let pretty_print = function(data,depth) {
 
 
 var files_to_open = nconf.get('_') || [];
-
-if (gui) {
-    if (files_to_open.length < 1) {
-        document.getElementById('fileDialog').click();
-    }
-}
 
 var sources = nconf.get('source');
 
