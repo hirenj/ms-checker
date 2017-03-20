@@ -52,4 +52,4 @@ if [[ -z "$input_dir" || -z "$output_dir" ]]; then
 	exit 1
 fi
 
-find "${input_dir}" -name "manifest*.xlsx" -exec node js/main.js --manifest {} --outputdir "$output_dir"
+find "${input_dir}" -name "manifest*.xlsx" -exec node js/main.js --manifest {} --outputdir "$output_dir" \;
