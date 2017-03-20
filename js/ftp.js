@@ -1,6 +1,7 @@
 var ftp = require('ftp');
 var parse_url = require('url').parse;
 var fs = require('fs');
+var nconf = require('nconf');
 
 var get_modtime = function(filename) {
     return new Promise(function(resolve,reject) {
@@ -84,6 +85,9 @@ var check_modified = function(timedata,url,filename,grace_period) {
 };
 
 var get_cached_file = function(url,filename,grace_period) {
+    if (nconf.get('offline')) {
+        return Promise.resolve([filename,false]);
+    }
     filename = __dirname+'/../'+filename;
     return Promise.all( [ get_modtime(filename), connect_ftp(url) ] ).then(function(promise_results) {
         return check_modified(promise_results,url,filename,grace_period || 0);
