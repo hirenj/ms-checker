@@ -412,8 +412,13 @@ var combine_all_peptides = function(peps) {
 
         block.spectra = spectra;
         block.activation = activations.filter(onlyUnique);
-        if (block.quant) {
+        if (block.quant && areas.medium.length > 0 && areas.light.length > 0) {
             block.quant.areas = {'M' : areas.medium[0], 'L' : areas.light[0] };
+        }
+
+        if ( ( ! block.quant || (! block.quant.channels) ) && first_pep.dimethyl_modification ) {
+            block.quant = block.quant || {};
+            block.quant.channels = first_pep.dimethyl_modification[0].toUpperCase();
         }
 
         if (has_possible_mods) {

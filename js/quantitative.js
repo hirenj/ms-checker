@@ -28,6 +28,11 @@ exports.swapChannelLabels = function(do_swap) {
     }
 }
 
+var dimethyl_names = {
+    'Dimethyl:2H4' : 'medium',
+    'Dimethyl' : 'light'
+};
+
 Object.defineProperty(exports, "wt_channel", { get: function () { return wt_channel; } });
 Object.defineProperty(exports, "ko_channel", { get: function () { return ko_channel; } });
 
@@ -489,6 +494,8 @@ var produce_peptide_modification_data = function(db,pep) {
                 }
             },reject);
         } else {
+            var dimethyls = (peptide_modifications_cache[pep.PeptideID] || []).map( mod => dimethyl_names[mod[1]] ).filter( mod => mod ).filter(onlyUnique);
+            pep.dimethyl_modification = dimethyls[0];
             pep.modifications = (peptide_modifications_cache[pep.PeptideID] || []).filter( function(mod) { return (mod[1] || '').indexOf(mod_string) >= 0 } ).map( clean_mod );
             resolve();
         }

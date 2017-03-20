@@ -491,7 +491,7 @@ exports.cleanup = function(db) {
 exports.composition = extract_composition;
 exports.combine = function(peps) {
     return require('./combiner').combine(peps);
-}
+};
 exports.calculate_deltacn = calculate_deltacn;
 exports.filter_deltacn = filter_deltacn;
 exports.merge_modifications_deltacn = merge_modifications_deltacn;
