@@ -99,11 +99,13 @@ var check_output_timestamps = function() {
         }
 
         var oldest = new Date(0);
+
+        var files_to_check = [].concat(files_to_open);
         if (nconf.get('manifest')) {
-            files_to_open.push(nconf.get('manifest'));
+            files_to_check.push(nconf.get('manifest'));
         }
 
-        files_to_open.forEach( file => {
+        files_to_check.forEach( file => {
             var file_date = new Date(fs.statSync(file).mtime);
             if (file_date > oldest) {
                 oldest = file_date;

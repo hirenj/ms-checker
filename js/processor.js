@@ -165,9 +165,13 @@ var clone = function(objectToBeCloned) {
 var open_db = function(filename) {
     return new Promise(function(resolve,reject) {
         var db = new sqlite3.Database(filename,sqlite3.OPEN_READWRITE,function(err) {
+            if (err) {
+              console.log(err);
+              reject(err);
+              return;
+            }
             db.run('CREATE index if not exists ms_check_spectrum_peak_id on SpectrumHeaders(MassPeakID)');
             if (err) {
-                console.log("Could not open file ",filename);
                 reject(err);
                 return;
             }
