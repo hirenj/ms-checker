@@ -170,6 +170,8 @@ var combine_metadata = function(metadatas) {
 };
 
 
+exports.version = get_self_version;
+
 exports.get_metadata = populate_metadata;
 
 exports.combine = combine_metadata;

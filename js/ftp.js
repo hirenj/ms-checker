@@ -27,6 +27,7 @@ var connect_ftp = function(url) {
         });
         ftp_site.on('error',reject);
     });
+    req.connTimeout = 500;
     ftp_site.connect(req);
     return result.catch(function(err) {
         console.log(err);

@@ -80,7 +80,7 @@ var populate_source_info = function(self,organism,tissue,cell_line) {
 };
 
 var populate_perturbation_info = function(self,taxid,genes,types) {
-  let result = { 'perturbation-ko': [], 'perturbation-ki': [] };
+  let result = { 'perturbation-ko': [], 'perturbation-ki': [], 'perturbation-wt' : [] };
   genes.forEach(function(gene,idx) {
     let gene_data = entrez.lookup(taxid,gene)[0];
     let type = 'perturbation-'+types[idx].toLowerCase();
