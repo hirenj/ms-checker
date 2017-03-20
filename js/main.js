@@ -50,14 +50,18 @@ if (manifest) {
     // data on the manifest contents to build the output files
     manifiest_parsing_done =  Promise.all( [ require('../js/uniprot').cellosaurus.init(), require('../js/entrez').init() ] ).then(function() {
         var conf_data = require('../js/manifests').populateConf(manifest);
+        var path_prefix = '';
+        if (nconf.get('prefix-basename')) {
+            path_prefix = path.basename(path.dirname(manifest)).replace(/[^A-Za-z0-9]+/,'_').toLowerCase()+'_';
+        }
 
         let wt_summary = conf_data['perturbation-wt'].length ? 'WT('+conf_data['perturbation-wt'].map( (wt) => wt.symbol ).join(';')+')' : '';
         let ki_summary = conf_data['perturbation-ki'].length ? 'KI('+conf_data['perturbation-ki'].map( (ki) => ki.symbol ).join(';')+')' : '';
         let ko_summary = conf_data['perturbation-ko'].length ? 'KO('+conf_data['perturbation-ko'].map( (ko) => ko.symbol ).join(';')+')' : '';
         let other_perturbation_summary = conf_data['perturbation-other'].length > 0 ? 'Other('+conf_data['perturbation-other']+')' : '';
-        let source_info = conf_data['source-cell_line'] || (conf_data['source-organism'] || '';
-        source_info = source_info.replace('-','');
-        conf_data.output = [    source_info + '(' + (conf_data['source-organism_part'] || 'bto:0001489') + ')',
+        let source_info = conf_data['source-cell_line'] || conf_data['source-organism'] || '';
+        source_info = (''+source_info).replace('-','');
+        conf_data.output = path_prefix+[    source_info + '(' + (conf_data['source-organism_part'] || 'bto:0001489') + ')',
                                 wt_summary, ki_summary, ko_summary, other_perturbation_summary
                             ].filter((val) => val).join('-')+'.msdata';
         nconf.use('metadata', { type: 'literal', store: conf_data });
@@ -95,6 +99,10 @@ var check_output_timestamps = function() {
         }
 
         var oldest = new Date(0);
+        if (nconf.get('manifest')) {
+            files_to_open.push(nconf.get('manifest'));
+        }
+
         files_to_open.forEach( file => {
             var file_date = new Date(fs.statSync(file).mtime);
             if (file_date > oldest) {

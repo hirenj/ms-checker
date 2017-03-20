@@ -52,4 +52,13 @@ if [[ -z "$input_dir" || -z "$output_dir" ]]; then
 	exit 1
 fi
 
-find "${input_dir}" -name "manifest*.xlsx" -exec node js/main.js --manifest {} --outputdir "$output_dir" \;
+for recipe_dir in `find "${input_dir}" -type f -name '*.recipe.json' -exec dirname {} \; | grep -v '^\.' | uniq`; do
+    runrecipe --input "$recipe_dir" --output "$output_dir" --nomangle
+    if [ $? -gt 0 ]; then
+        exit "$?"
+    fi
+done
+
+find "${input_dir}" -name "manifest*.xlsx" -exec node js/main.js --manifest {} --outputdir "$output_dir" --prefix-basename \;
+
+
