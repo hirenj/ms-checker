@@ -65,7 +65,7 @@ var populate_source_info = function(self,organism,tissue,cell_line) {
     } else {
       results['source-cell_line'] = cell_meta.names[0];
       results['source-organism'] = cell_meta.taxid;
-      results['source-organism_part'] = 'bto:'+cell_meta.bto;
+      results['source-organism_part'] = cell_meta.bto ? 'bto:'+cell_meta.bto : tissue[0];
       results['source-cellosaurus_id'] = cell_meta.acc;
     }
   } else {
