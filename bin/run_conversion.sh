@@ -68,12 +68,7 @@ if [ ! -z `which grunt` ]; then
     grunt version
 fi
 
-for recipe_dir in `find "${input_dir}" -type f -name '*.recipe.json' -exec dirname {} \; | grep -v '^\.' | uniq`; do
-    runrecipe --input "$recipe_dir" --output "$output_dir" --nomangle
-    if [ $? -gt 0 ]; then
-        exit "$?"
-    fi
-done
+find "${input_dir}" -type f -name '*.recipe.json' -exec runrecipe --input {} --output "$output_dir" --nomangle --database /Scratch/MSF-test/lookup.db \;
 
 find "${input_dir}" -name "manifest*.xlsx" -exec node js/main.js --manifest {} --outputdir "$output_dir" "$nonetwork" --prefix-basename \;
 
