@@ -502,6 +502,16 @@ var produce_peptide_modification_data = function(db,pep) {
     });
 };
 
+var populate_missing_quant_channel = function(peps) {
+    peps.forEach( pep => {
+        if (! pep.dimethyl_modification) {
+            var dimethyls = (peptide_modifications_cache[pep.PeptideID] || []).map( mod => dimethyl_names[mod[1]] ).filter( mod => mod ).filter(onlyUnique);
+            pep.dimethyl_modification = dimethyls[0];
+        }
+    });
+    return peps;
+};
+
 var init_caches = function(db) {
     return produce_peptide_modification_data(db,{}).then(function() { return find_dimethyls(db,{'PeptideID': 0}); });
 };
@@ -517,4 +527,5 @@ exports.init_caches = init_caches;
 exports.clear_caches = clear_caches;
 exports.retrieve_quantified_peptides = retrieve_quantified_peptides;
 exports.modifications_cache = peptide_modifications_cache;
+exports.populate_missing_quant_channel = populate_missing_quant_channel;
 exports.check_quantified_peptides = check_quantified_peptides;

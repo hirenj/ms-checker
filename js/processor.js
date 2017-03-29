@@ -272,6 +272,8 @@ var process_data = function(filename,sibling_files,source) {
           .then(tracker('Filter ambiguous spectra'))
           .then(hexnac_hcd.guess_hexnac.bind(hexnac_hcd,db,sibling_files))
           .then(tracker('HexNAc HCD'))
+          .then(quantitative.populate_missing_quant_channel)
+          .then(tracker('Populate missing quant channel'))
           .then(partial(fragmentation.validate_peptide_coverage,db))
           .then(tracker('Fragmentation validation'))
           .then(peptide.merge_modifications_deltacn.bind(peptide))
