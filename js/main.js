@@ -13,7 +13,8 @@ var path = require('path');
 
 nconf.env({ separator: "__", whitelist : ['MS_DEBUG'] }).argv();
 
-if (nconf.get('help') || ! nconf.get('manifest') || ! nconf.get('_')) {
+
+if (nconf.get('help') || (! nconf.get('manifest') && ! nconf.get('_'))) {
     console.log("ms-checker --manifest manifestfile.xlsx --outputdir output ..OR.. ms-checker --source somesource path/to/file.msf --output outputfile ");
     process.exit(1);
 }
@@ -114,7 +115,7 @@ var check_output_timestamps = function() {
         var current_config = nconf.get();
         current_config.output = base_version + '@' + current_config.output;
         nconf.add('metadata',{'type' : 'literal', 'store' : current_config});
-        var out_path = path.join(nconf.get('outputdir'),nconf.get('output')+'.json');
+        var out_path = path.join(nconf.get('outputdir') || '',nconf.get('output')+'.json');
         console.log("Deciding if we need to run for ",out_path);
         if (fs.existsSync(out_path)) {
             var current_version_time = (new Date(fs.statSync(out_path).mtime)).getTime();
