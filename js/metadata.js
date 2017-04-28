@@ -142,7 +142,8 @@ var get_score_metadata = function(db,metadata) {
 var populate_metadata = function(db) {
     var metadata = {
         'msdata-version' : MSDATA_FORMAT_VERSION,
-        'mimetype' : 'application/json+msdata'
+        'mimetype' : 'application/json+msdata',
+        'tags' : 'ccg'
     };
 
     return Promise.all( [ get_raw_filenames(db,metadata),

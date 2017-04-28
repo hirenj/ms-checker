@@ -68,7 +68,7 @@ if [ ! -z `which grunt` ]; then
     grunt version
 fi
 
-find "${input_dir}" -type f -name '*.recipe.json' -exec runrecipe --input {} --output "$output_dir" --nomangle --database /Scratch/MSF-test/lookup.db \;
+find "${input_dir}" -type f -name '*.recipe.json' -exec runrecipe --input {} --output "$output_dir" --nomangle --database /Scratch/MSF-test/lookup.db --env tags=ccg \;
 
 find "${input_dir}" -name "manifest*.xlsx" -exec node js/main.js --manifest {} --outputdir "$output_dir" "$nonetwork" --prefix-basename \;
 
