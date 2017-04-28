@@ -1,0 +1,26 @@
+#!/usr/bin/perl -w
+
+use File::Basename;
+
+my $paths = {};
+
+while (my $path = <STDIN>) {
+	chomp $path;
+	my $filename = basename($path);
+	if ($filename =~ /@/) {
+		my ($version,$file) = split '@', $filename;
+		if (! $paths->{$file}) {
+			$paths->{$file} = $path;
+		}
+		my ($curr_version,$curr_file) = split '@', basename($paths->{$file});
+		if ($curr_version lt $version) {
+			$paths->{$file} = $path;
+		}
+	} else {
+		$paths->{$filename} = $path;
+	}
+}
+
+foreach my $path (values %{$paths}) {
+	print "$path\n";
+}
