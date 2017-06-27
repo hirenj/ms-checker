@@ -37,7 +37,7 @@
       "required" : ["Gene","Type","Entrez_Gene"],
       "properties" : {
         "Gene" : { "type":  "array", "items" : { "type" : "string" }},
-        "Type"  : { "type":  "array", "items" : { "type" : "string", "enum" : ["KI","KO"] }},
+        "Type"  : { "type":  "array", "items" : { "type" : "string", "enum" : ["KI","KO","WT"] }},
         "Entrez_Gene" : { "type":  "array", "items" : { "type" : "number" }}
       }
     },
