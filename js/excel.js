@@ -88,12 +88,12 @@ var write_excel_file = function(datablock,filename) {
                     rows.push(data.concat([site[0],site[1]]));
                 });
             }
-            if (pep.ambiguous_mods) {
-                pep.ambiguous_mods.forEach(function(ambig) {
-                    rows.push(data.concat([null,null,ambig]));
+            if (pep.ambiguous_sites) {
+                pep.ambiguous_sites.forEach(function(ambig) {
+                    rows.push(data.concat([null,null,ambig[0].concat(ambig[1]).join('-') ]));
                 });
             }
-            if (! pep.sites && ! pep.ambiguous_mods) {
+            if (! pep.sites && ! pep.ambiguous_sites) {
                 rows.push(data.concat([ null,null,null ]));
             }
         });
