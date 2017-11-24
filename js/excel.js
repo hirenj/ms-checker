@@ -65,9 +65,9 @@ var write_excel_file = function(datablock,filename) {
                 data.push(null);
             }
 
-            if (pep.hexnac_type) {
-                data.push(pep.hexnac_type);
-                data.push(pep.hexnac_ratio);
+            if (pep.annotations && pep.annotations['hexnac_ratios']) {
+                data.push((pep.annotations['hexnac_calls'] || []).join(','));
+                data.push(pep.annotations['hexnac_ratios']);
             } else {
                 data.push(null);
                 data.push(null);
