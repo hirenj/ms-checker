@@ -1,0 +1,13 @@
+#!/bin/bash
+
+inputdir=$1
+output_s3=$2
+
+
+mkdir /tmp/tocopy
+
+
+
+(IFS=$'\n'; for file in `ls -1 $inputdir/*.json | perl bin/latest_files`; do cp "$file" /tmp/tocopy; done )
+
+s3cmd sync --dry-run --delete-removed /tmp/tocopy/ $output_s3
