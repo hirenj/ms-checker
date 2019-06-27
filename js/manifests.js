@@ -84,7 +84,7 @@ var populate_perturbation_info = function(self,taxid,genes,types,sample_identifi
   sample_identifier = sample_identifier.map( ids => ids.split(',').map( id => id.trim().toLowerCase() ) );
 
   let new_result = () => {return { 'perturbation-ko': [], 'perturbation-ki': [], 'perturbation-wt' : [] } };
-  let all_samples = Array.concat.apply([],sample_identifier).filter( id => id !== 'wt');
+  let all_samples = [].concat.apply([],sample_identifier).filter( id => id !== 'wt');
   let all_results = {};
   for (let sample of ['wt'].concat(all_samples)) {
     let result = new_result();
@@ -109,6 +109,7 @@ var populate_perturbation_info = function(self,taxid,genes,types,sample_identifi
     }
   }
   self.perturbation = all_samples.length === 1 ? all_results[all_samples[0]] : all_results;
+  console.log(JSON.stringify(self.perturbation,null,2));
   return "'perturbation'";
 };
 
@@ -140,7 +141,7 @@ var populate_conf = function populate_conf(manifest) {
     });
   }
   var manifest_version = conf_data.Manifest.Version[0];
-  if ( ! manifest_version.match(/^\d+\.?\d+?$/)) {
+  if ( ! manifest_version.toString().match(/^\d+\.?\d+?$/)) {
     throw new Error('Invalid manifest');
   }
   var schema = require('../resources/manifests/'+manifest_version+'/schema.json');
@@ -150,6 +151,7 @@ var populate_conf = function populate_conf(manifest) {
     throw new Error(valid.errors);
   }
   console.log("Validated manifest");
+
   return transform(conf_data, template, { paste: paste,
                                           summarise_ppms: summarise_ppms,
                                           summarise_quants : summarise_quants,
