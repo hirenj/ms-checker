@@ -84,11 +84,12 @@ var populate_perturbation_info = function(self,taxid,genes,types,sample_identifi
   sample_identifier = sample_identifier.map( ids => ids.split(',').map( id => id.trim().toLowerCase() ) );
 
   let new_result = () => {return { 'perturbation-ko': [], 'perturbation-ki': [], 'perturbation-wt' : [] } };
-  let all_samples = [].concat.apply([],sample_identifier).filter( id => id !== 'wt');
+  let all_samples = [].concat.apply([],sample_identifier).filter( id => id !== 'wt').filter( (o,i,a) => a.indexOf(o) === i );
   let all_results = {};
   for (let sample of ['wt'].concat(all_samples)) {
     let result = new_result();
     all_results[sample] = result;
+    result['perturbation-identifier'] = sample;
     genes.forEach(function(gene,idx) {
       // Skip genes that do not have the sample identifier
       // If there's no identifier, we assume it is the common sample (wt)
@@ -108,7 +109,15 @@ var populate_perturbation_info = function(self,taxid,genes,types,sample_identifi
       result['perturbation-other'] = [];
     }
   }
-  self.perturbation = all_samples.length === 1 ? all_results[all_samples[0]] : all_results;
+
+  let sample_ids = ['wt'].concat(all_samples);
+
+  let baseline = sample_ids[0];
+  self.perturbation = all_results[baseline];
+  let other_samples = all_samples.filter( sample => sample !== baseline ).map( sample => all_results[sample] );
+  if (other_samples.length > 0) {
+    self.perturbation.perturbations = other_samples;
+  }
   console.log(JSON.stringify(self.perturbation,null,2));
   return "'perturbation'";
 };
