@@ -115,10 +115,13 @@ var populate_perturbation_info = function(self,taxid,genes,types,sample_identifi
   let baseline = sample_ids[0];
   self.perturbation = all_results[baseline];
   let other_samples = all_samples.filter( sample => sample !== baseline ).map( sample => all_results[sample] );
+  other_samples.push( Object.assign({}, all_results[baseline] ));
   if (other_samples.length > 0) {
-    self.perturbation.perturbations = other_samples;
+    self.perturbation['perturbations'] = other_samples;
   }
-  console.log(JSON.stringify(self.perturbation,null,2));
+  self.perturbation['perturbation-ko'] = (other_samples.filter( sample => sample['perturbation-identifier'] === 'ko' )[0] || {})['perturbation-ko'] || [];
+  self.perturbation['perturbation-ki'] = (other_samples.filter( sample => sample['perturbation-identifier'] === 'ki' )[0] || {})['perturbation-ki'] || [];
+  self.perturbation['perturbation-wt'] = (other_samples.filter( sample => sample['perturbation-identifier'] === 'wt' )[0] || {})['perturbation-ko'] || [];
   return "'perturbation'";
 };
 

@@ -14,6 +14,9 @@ const score_type_sql = 'SELECT ScoreID, ScoreName, Description FROM ProcessingNo
 const MSDATA_FORMAT_VERSION = "1.3";
 
 var get_raw_filenames = function(db,metadata){
+    if ( ! db ) {
+        return Promise.resolve();
+    }
     var raw_filenames = [];
     return db.each(raw_files_sql,[],function(err,file) {
         raw_filenames.push({'file': file.FileName, 'created': new Date(file.FileTime).toISOString() });
@@ -23,6 +26,9 @@ var get_raw_filenames = function(db,metadata){
 };
 
 var get_fasta_filenames = function(db,metadata) {
+    if ( ! db ) {
+        return Promise.resolve();
+    }
     var fasta_filenames = [];
     return db.each(fasta_files_sql,[],function(err,file) {
         fasta_filenames.push(file.FileName);
@@ -52,9 +58,17 @@ var get_sample_metadata = function(metadata) {
     if ((nconf.get('perturbation-other') || '').length) {
         metadata['sample']['perturbation-other'] = nconf.get('perturbation-other');
     }
+    metadata['channel_samples'] = {};
+    for (let channel_sample of nconf.get('perturbations')) {
+        metadata['channel_samples'][channel_sample['perturbation-identifier']] = Object.assign({},channel_sample);
+        delete metadata['channel_samples'][channel_sample['perturbation-identifier']]['perturbation-identifier'];
+    }
 };
 
 var get_pd_metadata = function(db,metadata) {
+    if ( ! db ) {
+        return Promise.resolve();
+    }
     var version;
     var run_date;
     return db.each(pd_metadata_sql,[],function(err,software) {
@@ -129,6 +143,9 @@ var get_doi = function(metadata) {
 };
 
 var get_score_metadata = function(db,metadata) {
+    if ( ! db ) {
+        return Promise.resolve();
+    }
     var score_name, score_description;
 
     return db.each(score_type_sql,[],function(err,score) {
@@ -165,7 +182,9 @@ var combine_metadata = function(metadatas) {
         if ( ! result ) {
             return next;
         }
-        result['ms_run-location'] = result['ms_run-location'].concat(next['ms_run-location']);
+        if (next['ms_run-location']) {
+            result['ms_run-location'] = (result['ms_run-location'] || []).concat(next['ms_run-location']);
+        }
         return result;
     });
 };

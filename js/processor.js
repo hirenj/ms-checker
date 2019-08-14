@@ -232,6 +232,11 @@ var tracker = function(label) {
 
 var process_data = function(filename,sibling_files,source) {
     var global_datablock = {'data' : {}, 'metadata' : {}};
+    if ( ! filename ) {
+      return metadata.get_metadata().then( meta => {
+        global_datablock.metadata = meta;
+      }).then( () => global_datablock );
+    }
     return open_db(filename).then(function(db) {
         db.source = source;
         promisify_sqlite(db);
@@ -321,15 +326,17 @@ var process_files = function(files,sources) {
         }
 
 
-        if (! file) {
-            return blocks;
-        }
-        var other_files = files_by_source[source].filter(function(other_file) {
+
+        var other_files = (files_by_source[source] || []).filter(function(other_file) {
             return other_file !== file;
         });
         return process_data(file,other_files,source).then(function(block) {
-            blocks.push(block);
+          blocks.push(block);
+          if (files.length > 0 ) {
             return self_func();
+          } else {
+            return blocks;
+          }
         });
     });
 };
