@@ -82,7 +82,7 @@ var parse_cellosaurus = function(filename) {
             });
             Object.keys(cellosaurus).forEach(function(name) {
                 var entry = cellosaurus[name];
-                if (entry.parent && ! entry.bto) {
+                if (entry.parent && cellosaurus[entry.parent] && ! entry.bto) {
                     entry.bto = cellosaurus[entry.parent].bto;
                 }
             });

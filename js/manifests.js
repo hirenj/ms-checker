@@ -79,22 +79,49 @@ var populate_source_info = function(self,organism,tissue,cell_line) {
   return "'source'";
 };
 
-var populate_perturbation_info = function(self,taxid,genes,types) {
-  let result = { 'perturbation-ko': [], 'perturbation-ki': [], 'perturbation-wt' : [] };
-  genes.forEach(function(gene,idx) {
-    let gene_data = entrez.lookup(taxid,gene)[0];
-    let type = 'perturbation-'+types[idx].toLowerCase();
-    if ( ! result[type] ) {
-      result[type] = [];
+var populate_perturbation_info = function(self,taxid,genes,types,sample_identifier) {
+
+  sample_identifier = sample_identifier.map( ids => ids.split(',').map( id => id.trim().toLowerCase() ) );
+
+  let new_result = () => {return { 'perturbation-ko': [], 'perturbation-ki': [], 'perturbation-wt' : [] } };
+  let all_samples = [].concat.apply([],sample_identifier).filter( id => id !== 'wt').filter( (o,i,a) => a.indexOf(o) === i );
+  let all_results = {};
+  for (let sample of ['wt'].concat(all_samples)) {
+    let result = new_result();
+    all_results[sample] = result;
+    result['perturbation-identifier'] = sample;
+    genes.forEach(function(gene,idx) {
+      // Skip genes that do not have the sample identifier
+      // If there's no identifier, we assume it is the common sample (wt)
+      if ( sample_identifier[idx].indexOf(sample) < 0 && sample_identifier[idx].length > 0 ) {
+        return;
+      }
+      let gene_data = entrez.lookup(taxid,gene)[0];
+      let type = 'perturbation-'+types[idx].toLowerCase();
+      if ( ! result[type] ) {
+        result[type] = [];
+      }
+      result[type].push({'entrez' : parseInt(gene_data.entrez), 'symbol' : gene_data.name })
+    });
+    if (self.Other_Perturbations && self.Other_Perturbations.Description.length > 0 && (! self.Other_Perturbations.Identifier || self.Other_Perturbations.Identifier.toLowerCase().indexOf(sample) >= 0)) {
+      result['perturbation-other'] = self.Other_Perturbations.Description[0];
+    } else {
+      result['perturbation-other'] = [];
     }
-    result[type].push({'entrez' : parseInt(gene_data.entrez), 'symbol' : gene_data.name })
-  });
-  if (self.Other_Perturbations && self.Other_Perturbations.Description.length > 0) {
-    result['perturbation-other'] = self.Other_Perturbations.Description[0];
-  } else {
-    result['perturbation-other'] = [];
   }
-  self.perturbation = result;
+
+  let sample_ids = ['wt'].concat(all_samples);
+
+  let baseline = sample_ids[0];
+  self.perturbation = all_results[baseline];
+  let other_samples = all_samples.filter( sample => sample !== baseline ).map( sample => all_results[sample] );
+  other_samples.push( Object.assign({}, all_results[baseline] ));
+  if (other_samples.length > 0) {
+    self.perturbation['perturbations'] = other_samples;
+  }
+  self.perturbation['perturbation-ko'] = (other_samples.filter( sample => sample['perturbation-identifier'] === 'ko' )[0] || {})['perturbation-ko'] || [];
+  self.perturbation['perturbation-ki'] = (other_samples.filter( sample => sample['perturbation-identifier'] === 'ki' )[0] || {})['perturbation-ki'] || [];
+  self.perturbation['perturbation-wt'] = (other_samples.filter( sample => sample['perturbation-identifier'] === 'wt' )[0] || {})['perturbation-ko'] || [];
   return "'perturbation'";
 };
 
@@ -126,6 +153,9 @@ var populate_conf = function populate_conf(manifest) {
     });
   }
   var manifest_version = conf_data.Manifest.Version[0];
+  if ( ! manifest_version.toString().match(/^\d+\.?\d+?$/)) {
+    throw new Error('Invalid manifest');
+  }
   var schema = require('../resources/manifests/'+manifest_version+'/schema.json');
   var template = require('../resources/manifests/'+manifest_version+'/manifest_conf_mapping.template.json');
   var valid = (new Validator()).validate(conf_data,schema);
@@ -133,6 +163,7 @@ var populate_conf = function populate_conf(manifest) {
     throw new Error(valid.errors);
   }
   console.log("Validated manifest");
+
   return transform(conf_data, template, { paste: paste,
                                           summarise_ppms: summarise_ppms,
                                           summarise_quants : summarise_quants,
