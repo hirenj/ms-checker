@@ -46,7 +46,7 @@ var manifiest_parsing_done = Promise.resolve(true);
 if (manifest) {
     files_to_open = [];
     sources = [];
-
+    console.log(`Reading manifest file ${manifest}`);
     // Read .tsv or .xls file with
     // data on the manifest contents to build the output files
     manifiest_parsing_done =  Promise.all( [ require('../js/uniprot').cellosaurus.init(), require('../js/entrez').init() ] ).then(function() {

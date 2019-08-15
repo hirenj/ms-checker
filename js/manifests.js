@@ -153,9 +153,10 @@ var populate_conf = function populate_conf(manifest) {
     });
   }
   var manifest_version = conf_data.Manifest.Version[0];
-  if ( ! manifest_version.toString().match(/^\d+\.?\d+?$/)) {
+  if ( ! manifest_version.toString().match(/^\d+(:?\.\d+)?$/)) {
     throw new Error('Invalid manifest');
   }
+  console.log(`Reading manifest version ${manifest_version}`);
   var schema = require('../resources/manifests/'+manifest_version+'/schema.json');
   var template = require('../resources/manifests/'+manifest_version+'/manifest_conf_mapping.template.json');
   var valid = (new Validator()).validate(conf_data,schema);
