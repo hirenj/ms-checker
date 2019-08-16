@@ -91,6 +91,9 @@ var populate_perturbation_info = function(self,taxid,genes,types,sample_identifi
     all_results[sample] = result;
     result['perturbation-identifier'] = sample;
     genes.forEach(function(gene,idx) {
+      if ( ! sample_identifier[idx] ) {
+        return;
+      }
       // Skip genes that do not have the sample identifier
       // If there's no identifier, we assume it is the common sample (wt)
       if ( sample_identifier[idx].indexOf(sample) < 0 && sample_identifier[idx].length > 0 ) {
