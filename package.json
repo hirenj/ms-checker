@@ -4,7 +4,7 @@
   "dependencies": {
     "byline": "^4.2.1",
     "clone": "^1.0.2",
-    "csv-parse": "^1.1.0",
+    "csv-parse": "^4.6.5",
     "deasync": "^0.1.15",
     "ftp": "^0.3.10",
     "json-schema": "^0.2.2",
