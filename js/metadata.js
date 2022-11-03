@@ -59,7 +59,7 @@ var get_sample_metadata = function(metadata) {
         metadata['sample']['perturbation-other'] = nconf.get('perturbation-other');
     }
     metadata['channel_samples'] = {};
-    for (let channel_sample of nconf.get('perturbations')) {
+    for (let channel_sample of nconf.get('perturbations') || []) {
         metadata['channel_samples'][channel_sample['perturbation-identifier']] = Object.assign({},channel_sample);
         delete metadata['channel_samples'][channel_sample['perturbation-identifier']]['perturbation-identifier'];
     }

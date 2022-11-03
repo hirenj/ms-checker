@@ -3,10 +3,10 @@ var fs = require('fs');
 var get_cached_file = require('./ftp').get_cached_file;
 
 // Uniprot deleted accessions (find deleted entries):
-const DELETED_URL = 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/docs/delac_sp.txt';
+const DELETED_URL = 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/complete/docs/delac_sp.txt';
 
 // Uniprot secondary accessions (find merged entries):
-const MERGED_URL = 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/docs/sec_ac.txt';
+const MERGED_URL = 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/complete/docs/sec_ac.txt';
 
 // Cellosaurus respository
 const CELLOSAURUS_URL = 'ftp://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt';
