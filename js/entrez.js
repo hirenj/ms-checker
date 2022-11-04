@@ -1,6 +1,7 @@
 
 const https = require('https');
 const URL = require('url').URL;
+const NAMES = require('../ref_gene_names.json');
 
 class HTTPError extends Error{
   constructor(message,status) {
@@ -62,25 +63,13 @@ class Request {
 
 }
 
-
 class EntrezMeta {
   init() {
     return Promise.resolve(true);
   }
 
   lookup(taxid,gene) {
-    let req = new Request(`https://mygene.info/v3/query?q=${gene}&species=${taxid}`);
-    let sync = true;
-    let results = null;
-    req.loadJSON().then( res => {
-      results = res.hits.filter( hit => hit.entrezgene ).map( hit => {
-        let { entrezgene: entrez, symbol: name } = hit;
-        return { entrez, name, taxid };
-      });
-      sync = false;
-    });
-    while (sync) { require('deasync').sleep(1000); }
-    return results;
+    return NAMES.filter( entry => entry.taxid == taxid && entry.name.toLowerCase() == gene.toLowerCase() )
   }
 }
 
