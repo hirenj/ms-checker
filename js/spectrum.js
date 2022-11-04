@@ -60,6 +60,9 @@ WHERE \
     AND Charge = ? \
     AND Mass BETWEEN ? AND ?';
 
+const select_filenames_by_fileid_sql = 'SELECT FileID, FileName \
+FROM FileInfos';
+
 var spectrum_caches = {};
 
 var unzip_spectrum = function(spectrum_text) {
@@ -350,6 +353,21 @@ var match_spectrum_data = function(db, scan, rt, charge, mass) {
     });
 };
 
+var annotate_source_file = async function(db,peps) {
+    let sql_result = await db.all(select_filenames_by_fileid_sql);
+    let files_cache = sql_result.map( ({FileID,FileName}) => {
+        return {FileID, name: FileName};
+    });
+    for (let pep of peps) {
+        pep.source_file = files_cache.filter( file => file.FileID == pep.FileID )[0];
+        if ( ! pep.source_file ) {
+            process.exit(1);
+        }
+        delete pep.FileID
+    }
+    return peps;
+}
+
 var clear_caches = function() {
     spectrum_caches = {};
 };
@@ -362,4 +380,5 @@ exports.get_related_spectra = get_related_spectra;
 exports.match_spectrum_data = match_spectrum_data;
 exports.clear_caches = clear_caches;
 exports.filter_hcd_with_mods = filter_hcd_with_mods;
+exports.annotate_source_file = annotate_source_file;
 

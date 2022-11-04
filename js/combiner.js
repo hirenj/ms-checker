@@ -272,6 +272,7 @@ var combine_all_peptides = function(peps) {
         var max_score = null;
         var unaccepted_quant = null;
 
+        first_pep.filenames = peps.map( pep => pep.source_file.name ).filter(onlyUnique).join(',');
 
         var spectra = [];
         var activations = [];
@@ -372,6 +373,9 @@ var combine_all_peptides = function(peps) {
         }
         if (first_pep.multi_peptide) {
             block.multi_protein = block.multi_protein ? block.multi_protein+',peptide' : 'peptide';
+        }
+        if (first_pep.filenames) {
+            block.source_file = first_pep.filenames;
         }
 
         if (quant !== null) {

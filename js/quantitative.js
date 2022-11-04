@@ -161,12 +161,14 @@ const search_peptides_sql = 'SELECT \
     peptides.SearchEngineRank, \
     SpectrumHeaders.Mass as mass, \
     SpectrumHeaders.Charge as charge, \
+    MassPeaks.FileID as FileID, \
     ifnull(customdata.quantcount,0) as acceptedquant \
 FROM peptides \
     LEFT JOIN PrecursorIonQuanResultsSearchSpectra \
         ON peptides.SpectrumID = PrecursorIonQuanResultsSearchSpectra.SearchSpectrumID \
     LEFT JOIN SpectrumHeaders USING(SpectrumID) \
     LEFT JOIN ScanEvents USING(ScanEventID) \
+    LEFT JOIN MassPeaks USING(MassPeakID) \
     LEFT JOIN PrecursorIonQuanResults \
         ON PrecursorIonQuanResultsSearchSpectra.QuanResultID = PrecursorIonQuanResults.QuanResultID \
     LEFT JOIN (SELECT PeptideID, count(FieldID) as quantcount FROM CustomDataPeptides \

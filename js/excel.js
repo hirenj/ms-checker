@@ -25,6 +25,7 @@ var write_excel_file = function(datablock,filename) {
                     "precursor",
                     "charge",
                     "etd_eval",
+                    "filename",
                     "site",
                     "site_composition",
                     "ambiguous"
@@ -83,6 +84,8 @@ var write_excel_file = function(datablock,filename) {
             data.push(pep.spectra.map(function(spec) {  return spec.mass.toFixed(3);  }).join(","));
             data.push(pep.spectra.map(function(spec) {  return spec.charge;  }).join(","));
             data.push(pep.made_ambiguous || '');
+            data.push(pep.source_file);
+
             if (pep.sites) {
                 pep.sites.forEach(function(site) {
                     rows.push(data.concat([site[0],site[1]]));

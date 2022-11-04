@@ -152,7 +152,7 @@ manifiest_parsing_done
                      .then(function() { processor = require('../js/processor'); })
                      .then(function() { return processor.process(files_to_open,sources); })
                      .then(function(blocks) { return processor.combine(blocks,sources); })
-                     .then(function(combined) {
+                     .then(async function(combined) {
 
     // console.log(combined);
     let outpath = nconf.get('output');
@@ -171,10 +171,18 @@ manifiest_parsing_done
                 console.log(err);
             }
         }
+
+        await excel_writer.write(combined,outpath+'.xlsx').catch(console.log.bind(console));
+
+        for (let [prot,peps] of Object.entries(combined.data)) {
+            for (let pep of peps) {
+                delete pep.source_file;
+            }
+        }
+
         fs.writeFile(outpath+'.json',pretty_print(combined,2),function() {
             console.log("Wrote combined file");
         });
-        excel_writer.write(combined,outpath+'.xlsx').catch(console.log.bind(console));
     }
 }).catch(function(err) {
     if (err.message == 'current') {

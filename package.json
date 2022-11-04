@@ -1,8 +1,8 @@
 {
   "name": "ms-checker",
   "main": "js/main.js",
-  "engines" : { 
-    "node" : "=8.17.0"
+  "engines": {
+    "node": "v18.10.0"
   },
   "dependencies": {
     "byline": "^4.2.1",
@@ -21,7 +21,7 @@
     "progress": "^1.1.8",
     "sax": "^0.6.1",
     "saxpath": "^0.6.1",
-    "sqlite3": "^3.1.13",
+    "sqlite3": "^5.1.2",
     "stream-transform": "^0.1.1",
     "xlsx-style": "^0.8.6",
     "xml2js": "^0.4.6",
@@ -32,7 +32,6 @@
     "grunt-curl": "hirenj/grunt-curl",
     "grunt-git-describe": "^2.3.2",
     "grunt-githooks": "^0.3.1",
-    "grunt-node-inspector": "^0.4.1",
     "grunt-zip": "^0.17.1",
     "heapdump": "^0.3.5"
   }

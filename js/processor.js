@@ -270,6 +270,8 @@ var process_data = function(filename,sibling_files,source) {
         }).then(tracker('Read from DB'))
           .then(peptide.produce_peptide_scores_and_cleanup.bind(peptide,db))
           .then(tracker('Scores'))
+          .then(spectra.annotate_source_file.bind(null,db))
+          .then(tracker('Annotate source spectra'))
           .then(peptide.calculate_deltacn.bind(peptide))
           .then(peptide.filter_deltacn.bind(peptide,0.05))
           .then(tracker('Delta CN filtering'))
