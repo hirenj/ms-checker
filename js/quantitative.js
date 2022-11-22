@@ -149,6 +149,11 @@ FROM PeptidesTerminalModifications \
 
 const search_peptides_count_sql = 'SELECT count(*) as count from Peptides where ConfidenceLevel = 3 and SearchEngineRank <= 4';
 
+// We need to merge with ReporterIonQuanResults when this table exists
+// LEFT JOIN ReporterIonQuanResults USING(SpectrumID)
+
+// SELECT count(*) FROM sqlite_master WHERE type='table' AND name='ReporterIonQuanResults'
+
 const search_peptides_sql = 'SELECT \
     peptides.PeptideID, \
     peptides.UniquePeptideSequenceID, \
@@ -183,6 +188,34 @@ AND peptides.PeptideID in (SELECT distinct PeptideID \
         WHERE ModificationName like "%'+mod_string+'%") \
     )';
 
+const search_peptides_sql_tmt = 'SELECT \
+    peptides.PeptideID, \
+    peptides.UniquePeptideSequenceID, \
+    peptides.SpectrumID, \
+    peptides.Sequence, \
+    ReporterIonQuanResults.QuanChannelID, \
+    ReporterIonQuanResults.Height, \
+    ScanEvents.ActivationType as ActivationType, \
+    peptides.SearchEngineRank, \
+    SpectrumHeaders.Mass as mass, \
+    SpectrumHeaders.Charge as charge, \
+    MassPeaks.FileID as FileID \
+FROM peptides \
+    LEFT JOIN SpectrumHeaders USING(SpectrumID) \
+    LEFT JOIN ScanEvents USING(ScanEventID) \
+    LEFT JOIN MassPeaks USING(MassPeakID) \
+    LEFT JOIN ReporterIonQuanResultsSearchSpectra \
+    ON peptides.SpectrumID = ReporterIonQuanResultsSearchSpectra.SearchSpectrumID \
+    LEFT JOIN ReporterIonQuanResults \
+    ON ReporterIonQuanResultsSearchSpectra.SpectrumID = ReporterIonQuanResults.SpectrumID \
+WHERE peptides.ConfidenceLevel = 3 \
+AND SearchEngineRank <= 4 \
+AND peptides.PeptideID in (SELECT distinct PeptideID \
+    FROM PeptidesAminoAcidModifications \
+    WHERE AminoAcidModificationID in (SELECT AminoAcidModificationID \
+        FROM AminoAcidModifications \
+        WHERE ModificationName like "%'+mod_string+'%") \
+    )';
 
 const MASS_MEDIUM = 32.056407;
 const MASS_LIGHT = 28.0313;
@@ -327,14 +360,20 @@ var combine_quantified_peptides = function(peps,channel_conf) {
     peps.forEach(function(pep) {
         var curr_pep = all_peps[pep.PeptideID] ||  pep;
         curr_pep.areas = curr_pep.areas || {};
+        curr_pep.heights = curr_pep.heights || {};
+
         if ( pep.QuanChannelID && pep.QuanChannelID != "medium" || pep.QuanChannelID != "light" ) {
             pep.QuanChannelID = channel_conf[pep.QuanChannelID];
         }
+
         if (pep.Area && pep.QuanChannelID) {
             if (pep.QuanChannelID != 'medium' && pep.QuanChannelID != 'light') {
                 throw new Error("Could not resolve Quant channel ID",pep.QuanChannelID);
             }
             curr_pep.areas[pep.QuanChannelID] = pep.Area;
+        }
+        if (pep.Height != null && pep.QuanChannelID) {
+            curr_pep.heights[pep.QuanChannelID] = pep.Height;
         }
         if (! Array.isArray(curr_pep.QuanChannelID) ) {
             curr_pep.QuanChannelID =  curr_pep.QuanChannelID ? [ curr_pep.QuanChannelID ] : [];
@@ -342,7 +381,7 @@ var combine_quantified_peptides = function(peps,channel_conf) {
         if (curr_pep != pep && pep.QuanChannelID) {
             curr_pep.QuanChannelID.push(pep.QuanChannelID);
         }
-        if (Object.keys(curr_pep.areas).length != curr_pep.QuanChannelID.length) {
+        if (Object.keys(curr_pep.areas).length != curr_pep.QuanChannelID.length && Object.keys(curr_pep.heights).length != curr_pep.QuanChannelID.length) {
             throw new Error("quant_channel_counts")
         }
         all_peps[pep.PeptideID] = curr_pep;
@@ -376,7 +415,7 @@ var get_channel_config = function(db) {
                     throw err;
                 }
                 var channel_infos = result.ProcessingMethod.MethodPart.filter(function(part) {
-                    return part.$.name == 'QuanChannels';
+                    return part.$.name == 'QuanChannels' || part.$.name == 'MassTags';
                 })[0].MethodPart;
                 var extracted = channel_infos.map(extract_channel_info);
                 resolve(extracted);
@@ -394,7 +433,12 @@ var retrieve_quantified_peptides = function(db) {
     db.all(search_peptides_count_sql).then(function(count) {
         total_count = count[0].count;
     });
-    return db.each(search_peptides_sql,[],function(err,pep) {
+
+    let is_tmt = true;
+
+    let search_sql = is_tmt ? search_peptides_sql_tmt : search_peptides_sql;
+
+    return db.each(search_sql,[],function(err,pep) {
         idx += 1;
         if (pep) {
             pep.acceptedquant = (pep.acceptedquant == 0) ? false : true;
@@ -420,14 +464,21 @@ var check_quantified_peptides = function(db,peps) {
     var setup_config = get_channel_config(db).then(function(quant_config) {
         var channel_conf = {};
         if (quant_config.length != 2) {
+            // This only works because Dimethyl has QuanResultID
             var quant_peps = peps.filter(function(pep) { return pep.QuanResultID; });
             if (quant_peps.length > 0) {
                 throw new Error("Incorrect number of quant channels");
             }
         }
         quant_config.forEach(function(conf) {
-            channel_conf[ conf.ChannelName.toLowerCase() ] = conf.ChannelID;
-            channel_conf[ conf.ChannelID ] = conf.ChannelName.toLowerCase();
+            if (conf.ChannelName) {
+                channel_conf[ conf.ChannelName.toLowerCase() ] = conf.ChannelID;
+                channel_conf[ conf.ChannelID ] = conf.ChannelName.toLowerCase();
+            }
+            if (conf.TagName) {
+                channel_conf[ conf.TagName.toLowerCase() ] = conf.TagID;
+                channel_conf[ conf.TagID ] = conf.TagName.toLowerCase();                
+            }
         });
         return channel_conf;
     });

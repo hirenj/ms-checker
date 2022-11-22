@@ -279,6 +279,8 @@ var combine_all_peptides = function(peps) {
         var areas = {'medium': [], 'light' : []};
         var quant_intensity = {'min' : null, 'max' : null};
         peps.forEach(function(pep) {
+            console.log(pep);
+            process.exit(0);
             if (pep.acceptedquant) {
                 if ("CalculatedRatio" in pep) {
                     quant = pep.CalculatedRatio;
