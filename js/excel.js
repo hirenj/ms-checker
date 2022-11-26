@@ -32,10 +32,13 @@ var write_excel_file = function(datablock,filename) {
                 ]];
     var metadata = [];
     var peptide_id = 0;
-    if (! Array.isArray(datablock.metadata) && datablock.metadata ) {
-        datablock.metadata = [ datablock.metadata ];
+
+    let input_metadata = datablock.metadata;
+
+    if (! Array.isArray(input_metadata) && input_metadata ) {
+        input_metadata = [ input_metadata ];
     }
-    (datablock.metadata || []).forEach(function(meta) {
+    (input_metadata || []).forEach(function(meta) {
         metadata.push([ JSON.stringify(meta,null,'    ') ]);
     });
     Object.keys(datablock.data).forEach(function(uniprot) {
