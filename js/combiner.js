@@ -388,7 +388,7 @@ var combine_all_peptides = function(peps) {
             quant_info.push( { channels: first_pep.dimethyl_modification[0].toUpperCase() } );
         }
 
-        if (first_pep.QuanChannelID.indexOf('126') >= 0) {
+        if (Array.isArray(first_pep.QuanChannelID) && first_pep.QuanChannelID.indexOf('126') >= 0) {
             quant_info.push({ raw: first_pep.heights });
         }
 
