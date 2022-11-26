@@ -11,7 +11,7 @@ const pd_metadata_sql = "SELECT SoftwareVersion, Date FROM SchemaInfo";
 
 const score_type_sql = 'SELECT ScoreID, ScoreName, Description FROM ProcessingNodeScores';
 
-const MSDATA_FORMAT_VERSION = "1.4";
+const MSDATA_FORMAT_VERSION = "1.5";
 
 var get_raw_filenames = function(db,metadata){
     if ( ! db ) {

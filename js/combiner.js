@@ -322,7 +322,7 @@ var combine_all_peptides = function(peps) {
                 has_possible_mods = true;
             }
 
-            for (let channel of pep.QuanChannelID) {
+            for (let channel of (pep.QuanChannelID || [])) {
                 if (! raw_quants[channel] ) {
                     raw_quants[channel] = [];
                 }
