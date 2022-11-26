@@ -262,7 +262,7 @@ var combine_all_peptides = function(peps) {
             return;
         }
         var first_pep = peps[0];
-        var quant = null;
+        let dimethyl_quant = null;
         var high_sn = false;
         var confident_singlet = false;
         var has_possible_mods = false;
@@ -276,14 +276,12 @@ var combine_all_peptides = function(peps) {
 
         var spectra = [];
         var activations = [];
-        var areas = {'medium': [], 'light' : []};
+        var raw_quants = {};
         var quant_intensity = {'min' : null, 'max' : null};
         peps.forEach(function(pep) {
-            console.log(pep);
-            process.exit(0);
             if (pep.acceptedquant) {
                 if ("CalculatedRatio" in pep) {
-                    quant = pep.CalculatedRatio;
+                    dimethyl_quant = pep.CalculatedRatio;
                     high_sn = true;
                     if (pep.CalculatedRatio == 1/100000 || pep.CalculatedRatio == 100000) {
                         is_singlet = true;
@@ -301,7 +299,7 @@ var combine_all_peptides = function(peps) {
             if (pep.acceptedquant && "has_pair" in pep && pep.has_pair === true && pep.used && ( pep.activation !== 'HCD' && pep.activation !== 'CID' )) {
                 // Potential ratio 1/100000 in the potential_light
                 // Potential ratio 100000 in the potential_medium
-                quant = pep.QuanChannelID[0] == quantitative.wt_channel ? 'potential_wt' : 'potential_ko';
+                dimethyl_quant = pep.QuanChannelID[0] == quantitative.wt_channel ? 'potential_wt' : 'potential_ko';
             }
 
             if ( ! pep.acceptedquant ) {
@@ -324,25 +322,13 @@ var combine_all_peptides = function(peps) {
                 has_possible_mods = true;
             }
 
-            // The areas arrays should only contain the areas for the
-            // quantitations that have been accepted.
+            for (let channel of pep.QuanChannelID) {
+                if (! raw_quants[channel] ) {
+                    raw_quants[channel] = [];
+                }
+                raw_quants[channel].push(pep.acceptedquant ? pep.areas[channel] || 0 : 0);
+            }
 
-            if (pep.areas && pep.acceptedquant && pep.areas['medium']) {
-                areas['medium'].push(pep.areas['medium']);
-                if ( ! pep.areas['light']) {
-                    areas['light'].push(0);
-                }
-            }
-            if (pep.areas && pep.acceptedquant && pep.areas['light']) {
-                areas['light'].push(pep.areas['light']);
-                if ( ! pep.areas['medium']) {
-                    areas['medium'].push(0);
-                }
-            }
-            if ( ! pep.areas || ! (pep.areas['light'] || pep.areas['medium']) || ! pep.acceptedquant ) {
-                areas['light'].push(0);
-                areas['medium'].push(0);
-            }
             if (pep.quant_intensity_range) {
                 if (quant_intensity.min === null || pep.quant_intensity_range.min < quant_intensity[0]) {
                     quant_intensity.min = pep.quant_intensity_range[0];
@@ -361,7 +347,7 @@ var combine_all_peptides = function(peps) {
         // singlet goes in the same direction as the other quants, but
         // I think the logic of that is a bit iffy.
 
-        if (quant && unaccepted_quant) {
+        if (dimethyl_quant && unaccepted_quant) {
             unaccepted_quant = null;
         }
 
@@ -380,19 +366,38 @@ var combine_all_peptides = function(peps) {
             block.source_file = first_pep.filenames;
         }
 
-        if (quant !== null) {
-            block.quant = isNaN(parseInt(quant)) ? {'quant' : quant } : {'quant' : +quant.toFixed(3), 'mad' : first_pep.CalculatedRatio_mad };
-            block.quant.channels = quantitative.ko_channel[0].toUpperCase()+':'+quantitative.wt_channel[0].toUpperCase();
+        let quant_info = [];
+        if (dimethyl_quant !== null) {
+            let quant_block = isNaN(parseInt(dimethyl_quant)) ? {'quant' : dimethyl_quant } : {'quant' : +dimethyl_quant.toFixed(3), 'mad' : first_pep.CalculatedRatio_mad };
+            quant_block.channels = quantitative.ko_channel[0].toUpperCase()+':'+quantitative.wt_channel[0].toUpperCase();
             if (is_singlet) {
-                block.quant.singlet_confidence = confident_singlet ? 'high' : 'low';
+                quant_block.singlet_confidence = confident_singlet ? 'high' : 'low';
                 if ( ! high_sn ) {
-                    block.quant.singlet_confidence = 'low_sn';
+                    quant_block.singlet_confidence = 'low_sn';
                 }
-                block.quant.intensities = quant_intensity;
+                quant_block.intensities = quant_intensity;
             }
+            if (raw_quants.medium.length > 0 && raw_quants.light.length > 0) {
+                quant_block.areas = {'M' : raw_quants.medium[0], 'L' : raw_quants.light[0] };
+            }
+            quant_info.push({ raw: quant_block.areas });
+            quant_info.push(quant_block);
         }
+
+        if ( ! dimethyl_quant && first_pep.dimethyl_modification ) {
+            quant_info.push( { channels: first_pep.dimethyl_modification[0].toUpperCase() } );
+        }
+
+        if (first_pep.QuanChannelID.indexOf('126') >= 0) {
+            quant_info.push({ raw: first_pep.heights });
+        }
+
+        if (quant_info.length > 0) {
+            block.quant = quant_info;
+        }
+
         if (unaccepted_quant) {
-            block.quant = {'quant' : "rejected_"+unaccepted_quant };
+            block.quant = [{'quant' : "rejected_"+unaccepted_quant }];
         }
         if (Object.keys(hexnac_type).length > 0) {
             block.annotations[ 'hexnac_calls' ] = Object.keys(hexnac_type).sort();
@@ -418,14 +423,6 @@ var combine_all_peptides = function(peps) {
 
         block.spectra = spectra;
         block.activation = activations.filter(onlyUnique);
-        if (block.quant && areas.medium.length > 0 && areas.light.length > 0) {
-            block.quant.areas = {'M' : areas.medium[0], 'L' : areas.light[0] };
-        }
-
-        if ( ( ! block.quant || (! block.quant.channels) ) && first_pep.dimethyl_modification ) {
-            block.quant = block.quant || {};
-            block.quant.channels = first_pep.dimethyl_modification[0].toUpperCase();
-        }
 
         if (has_possible_mods) {
             block.ambiguous_mods = peps.filter(function(pep) { return pep.possible_mods; }).map(function(pep) {

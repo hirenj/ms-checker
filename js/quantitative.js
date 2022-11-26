@@ -372,15 +372,21 @@ var combine_quantified_peptides = function(peps,channel_conf) {
             }
             curr_pep.areas[pep.QuanChannelID] = pep.Area;
         }
+
+
         if (pep.Height != null && pep.QuanChannelID) {
-            curr_pep.heights[pep.QuanChannelID] = pep.Height;
+            // TMT SUM HEIGHTS OR NOT
+            // curr_pep.heights[pep.QuanChannelID] += (curr_pep.heights[pep.QuanChannelID] || []).push(pep.Height);
+            curr_pep.heights[pep.QuanChannelID] = ( curr_pep.heights[pep.QuanChannelID] || 0 ) + pep.Height;
         }
         if (! Array.isArray(curr_pep.QuanChannelID) ) {
             curr_pep.QuanChannelID =  curr_pep.QuanChannelID ? [ curr_pep.QuanChannelID ] : [];
         }
-        if (curr_pep != pep && pep.QuanChannelID) {
+
+        if (curr_pep != pep && pep.QuanChannelID && curr_pep.QuanChannelID.indexOf(pep.QuanChannelID) < 0) {
             curr_pep.QuanChannelID.push(pep.QuanChannelID);
         }
+
         if (Object.keys(curr_pep.areas).length != curr_pep.QuanChannelID.length && Object.keys(curr_pep.heights).length != curr_pep.QuanChannelID.length) {
             throw new Error("quant_channel_counts")
         }
