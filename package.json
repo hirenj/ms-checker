@@ -24,7 +24,7 @@
     "sqlite3": "^5.1.2",
     "stream-transform": "^0.1.1",
     "xlsx-style": "^0.8.6",
-    "xml2js": "^0.4.6",
+    "xml2js": "^0.5.0",
     "yauzl": "^2.2.1"
   },
   "devDependencies": {
