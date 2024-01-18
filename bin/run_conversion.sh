@@ -68,13 +68,20 @@ if [ ! -z `which grunt` ]; then
     grunt version
 fi
 
-last_modified_recipe=$(grep -L 'ms-checker' $output_dir/* | tr '\n' '\0' | xargs -0 ls -1t | head -1)
+last_modified_recipe=$(grep -L 'ms-checker' $output_dir/recipe_* | tr '\n' '\0' | xargs -0 ls -1t | head -1)
 
 last_modified_recipe_date=$(date -r "$last_modified_recipe" '+%Y-%m-%d %H:%M:%S')
 
 echo "Last modified recipe is at $last_modified_recipe_date, $last_modified_recipe"
 
-find "${input_dir}" -type f -name '*.recipe.json' -newermt "$last_modified_recipe_date" -not -name "._*" -exec runrecipe --input {} --output "$output_dir" --nomangle --database "${input_dir}/lookup.db" --env tags=ccg \;
+temp_recipe_dir=$(mktemp -d)
+
+find "${input_dir}" -type f -name '*.recipe.json' -newermt "$last_modified_recipe_date" -not -name "._*" -exec runrecipe --input {} --output "$temp_recipe_dir" --nomangle --database "${input_dir}/lookup.db" --env tags=ccg \;
+
+for file in $temp_recipe_dir/*.json; do
+    filename=$(basename "$file")
+    mv "$file" "$output_dir/recipe_${filename}"
+done
 
 find "${input_dir}" -name "manifest*.xlsx" -exec node js/main.js --manifest {} --outputdir "$output_dir" "$nonetwork" --prefix-basename \;
 
