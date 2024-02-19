@@ -73,6 +73,9 @@ var clean_comp = function(comp) {
     comp = comp.replace('xTn','xHexNAc');
     comp = comp.replace('xT','xHexHexNAc');
     comp = comp.replace('xGalNAc','xHexNAc');
+    if (comp.indexOf('Hex') < 0) {
+        return;
+    }
     return comp;
 }
 
@@ -98,10 +101,11 @@ var retrieve_ambiguous_peptides = function(db) {
             self.notify_progress('progress',peps.length,peps.length);
             peptide_search.cleanup(db);
             peps.forEach(function(pep) {
+                //var composition = (pep.FileName || "").match(/((:?\d+\x[^x][^%]+_){0,}\d+\x[^x][^%]+)(?=\.mgf)/g);
                 var composition = (pep.FileName || "").match(/\d+\x[^%]+(?=\.mgf)/);
                 composition = Array.prototype.concat.apply( [], composition.map(function(comp) { return comp.split(/[_,]/); }) );
                 if ( composition ) {
-                    pep.Composition = composition.map(function(comp) { return comp.toString(); }).map(clean_comp);
+                    pep.Composition = composition.map(function(comp) { return comp.toString(); }).map(clean_comp).filter( val => val );
                 }
                 delete pep.FileName;
             });
