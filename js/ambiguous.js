@@ -73,7 +73,8 @@ var clean_comp = function(comp) {
     comp = comp.replace('xTn','xHexNAc');
     comp = comp.replace('xT','xHexHexNAc');
     comp = comp.replace('xGalNAc','xHexNAc');
-    if (comp.indexOf('Hex') < 0) {
+    if (! comp.match(/(:?([0-9]+xHex)?([0-9]+xHexHex)?([0-9]+xHexHexNAc)?([0-9]+xHexNAc)?([0-9]+xdHex)?([0-9]+xNeuAc)?([0-9]+xNeuGc)?([0-9]+xSia)?([0-9]+xPhospho)?;)*(:?([0-9]+xHex)?([0-9]+xHexHex)?([0-9]+xHexHexNAc)?([0-9]+xHexNAc)?([0-9]+xdHex)?([0-9]+xNeuAc)?([0-9]+xNeuGc)?([0-9]+xSia)?([0-9]+xPhospho)?)/)) {
+        console.log(`Dropping Composition: ${comp}`);
         return;
     }
     return comp;
