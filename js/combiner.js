@@ -72,7 +72,12 @@ var rewrite_deamidation = function(peps) {
             if (mod[1].indexOf('Deamidated') >= 0) {
                 mod[1] = 'GlcNAc(b1-4)GlcNAc';
             }
-        })
+        });
+        (pep.possible_mods || []).forEach(function(mod) {
+            if (mod[1].indexOf('Deamidated') >= 0) {
+                mod[1] = 'GlcNAc(b1-4)GlcNAc';
+            }
+        });
     });
 };
 
@@ -502,7 +507,8 @@ var consolidate_ambiguous_compositions = function(sites) {
         all_sites.push(site);
     });
     return all_sites.filter(onlyUnique).map( mod => {
-        let mod_bits = mod.split(/[\(\)]/).slice(0,2);
+        let site_range = mod.split(/[\(\)]/)[0];
+        let mod_bits = [site_range, mod.replace(site_range,'').replace(/^\(/,'').replace(/\)$/,'') ];
         let range_ends = mod_bits[0].split('-').map( end => +end );
         if (site_counts[mod] > 1) {
             mod_bits[1] = site_counts[mod] + 'x' + mod_bits[1];
