@@ -78,6 +78,11 @@ var rewrite_deamidation = function(peps) {
                 mod[1] = 'GlcNAc(b1-4)GlcNAc';
             }
         });
+        if (pep.Composition) {
+            pep.Composition = pep.Composition.map( mod => {
+                return mod.replace(/Deamidated:?O?/,'GlcNAc(b1-4)GlcNAc');
+            });
+        }
     });
 };
 
