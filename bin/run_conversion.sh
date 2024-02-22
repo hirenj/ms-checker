@@ -68,20 +68,30 @@ if [ ! -z `which grunt` ]; then
     grunt version
 fi
 
-last_modified_recipe=$(grep -L 'ms-checker' $output_dir/recipe_* | tr '\n' '\0' | xargs -0 ls -1t | head -1)
+if [[ -f $output_dir/recipe_* ]]; then
 
-last_modified_recipe_date=$(date -r "$last_modified_recipe" '+%Y-%m-%d %H:%M:%S')
+    last_modified_recipe=$(grep -L 'ms-checker' $output_dir/recipe_* | tr '\n' '\0' | xargs -0 ls -1t | head -1)
 
-echo "Last modified recipe is at $last_modified_recipe_date, $last_modified_recipe"
+    last_modified_recipe_date=$(date -r "$last_modified_recipe" '+%Y-%m-%d %H:%M:%S')
+
+    echo "Last modified recipe is at $last_modified_recipe_date, $last_modified_recipe"
+else
+    echo "No previously run recipes, running all"
+    last_modified_recipe_date="1970-01-01 00:00:00"
+fi
 
 temp_recipe_dir=$(mktemp -d)
 
-find "${input_dir}" -type f -name '*.recipe.json' -newermt "$last_modified_recipe_date" -not -name "._*" -exec runrecipe --input {} --output "$temp_recipe_dir" --nomangle --database "${input_dir}/lookup.db" --env tags=ccg \;
+find "${input_dir}" -type f -wholename '**/*.recipe.json' -newermt "$last_modified_recipe_date" -not -name "._*" -exec runrecipe --input {} --output "$temp_recipe_dir" --nomangle --database "${input_dir}/lookup.db" --env tags=ccg \;
 
-for file in $temp_recipe_dir/*.json; do
-    filename=$(basename "$file")
-    mv "$file" "$output_dir/recipe_${filename}"
-done
+if [[ -f $temp_recipe_dir/*.json ]]; then
+
+    for file in $temp_recipe_dir/*.json; do
+        filename=$(basename "$file")
+        mv "$file" "$output_dir/recipe_${filename}"
+    done
+
+fi
 
 find "${input_dir}" -name "manifest*.xlsx" -exec node js/main.js --manifest {} --outputdir "$output_dir" "$nonetwork" --prefix-basename \;
 
