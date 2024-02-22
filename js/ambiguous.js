@@ -73,7 +73,8 @@ var clean_comp = function(comp) {
     comp = comp.replace('xTn','xHexNAc');
     comp = comp.replace('xT','xHexHexNAc');
     comp = comp.replace('xGalNAc','xHexNAc');
-    if (! comp.match(/(:?([0-9]+xHex)?([0-9]+xHexHex)?([0-9]+xHexHexNAc)?([0-9]+xHexNAc)?([0-9]+xdHex)?([0-9]+xNeuAc)?([0-9]+xNeuGc)?([0-9]+xSia)?([0-9]+xPhospho)?;)*(:?([0-9]+xHex)?([0-9]+xHexHex)?([0-9]+xHexHexNAc)?([0-9]+xHexNAc)?([0-9]+xdHex)?([0-9]+xNeuAc)?([0-9]+xNeuGc)?([0-9]+xSia)?([0-9]+xPhospho)?)/)) {
+    let any_comp = comp.match(/(:?([0-9]+xHex)?([0-9]+xHexHex)?([0-9]+xHexHexNAc)?([0-9]+xHexNAc)?([0-9]+xdHex)?([0-9]+xNeuAc)?([0-9]+xNeuGc)?([0-9]+xSia)?([0-9]+xPhospho)?;)*(:?([0-9]+xHex)?([0-9]+xHexHex)?([0-9]+xHexHexNAc)?([0-9]+xHexNAc)?([0-9]+xdHex)?([0-9]+xNeuAc)?([0-9]+xNeuGc)?([0-9]+xSia)?([0-9]+xPhospho)?)/g).filter( (o,i,a) => a.indexOf(o) == i);
+    if (any_comp.filter( a_comp => a_comp && a_comp.length > 0 ).length < 1) {
         console.log(`Dropping Composition: ${comp}`);
         return;
     }
