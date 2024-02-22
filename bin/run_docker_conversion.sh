@@ -1,11 +1,11 @@
 #!/bin/bash
 
-wanted_version=$(cat version.json | jq --raw-output '.revision[0]')
+#wanted_version=$(cat version.json | jq --raw-output '.revision[0]')
 
-input_dir=${1:-/work}
+input_dir=${1:-/input}
 output_parent=${2:-/dist}
 
-output_dir="${output_parent}/msdatas-${wanted_version}"
+output_dir="${output_parent}"
 
 mkdir -p "$output_dir"
 
