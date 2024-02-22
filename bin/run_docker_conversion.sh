@@ -15,10 +15,16 @@ mkdir -p "$output_dir"
 # #	'/Volumes/trs582/brain_msfs/msfs'
 # )
 
-curl --output uniprot.deleted.txt 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/complete/docs/delac_sp.txt'
-curl --output uniprot.merged.txt 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/complete/docs/sec_ac.txt'
-curl -O 'ftp://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt'
 
+if [[ ! -f "uniprot.deleted.txt" ]]; then
+	curl --output uniprot.deleted.txt 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/complete/docs/delac_sp.txt'
+fi
+if [[ ! -f "uniprot.merged.txt" ]]; then
+	curl --output uniprot.merged.txt 'ftp://ftp.uniprot.org/pub/databases/uniprot/knowledgebase/complete/docs/sec_ac.txt'
+fi
+if [[ ! -f "cellosaurus.txt" ]]; then
+	curl -O 'ftp://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt'
+fi
 
 
 for folder in $input_dir/*/; do

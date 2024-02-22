@@ -84,13 +84,15 @@ temp_recipe_dir=$(mktemp -d)
 
 find "${input_dir}" -type f -wholename '**/*.recipe.json' -newermt "$last_modified_recipe_date" -not -name "._*" -exec runrecipe --input {} --output "$temp_recipe_dir" --nomangle --database "${input_dir}/lookup.db" --env tags=ccg \;
 
-if [[ -f $temp_recipe_dir/*.json ]]; then
+if compgen -G "${temp_recipe_dir}/*" > /dev/null; then
 
     for file in $temp_recipe_dir/*.json; do
         filename=$(basename "$file")
         mv "$file" "$output_dir/recipe_${filename}"
     done
 
+else
+    echo "No generated recipe files"
 fi
 
 find "${input_dir}" -name "manifest*.xlsx" -exec node js/main.js --manifest {} --outputdir "$output_dir" "$nonetwork" --prefix-basename \;
