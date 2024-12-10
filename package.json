@@ -21,7 +21,7 @@
     "progress": "^1.1.8",
     "sax": "^0.6.1",
     "saxpath": "^0.6.1",
-    "sqlite3": "^5.1.2",
+    "sqlite3": "^5.1.5",
     "stream-transform": "^0.1.1",
     "xlsx-style": "^0.8.6",
     "xml2js": "^0.4.6",
