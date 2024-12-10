@@ -28,7 +28,7 @@
     "yauzl": "^2.2.1"
   },
   "devDependencies": {
-    "grunt": "^0.4.5",
+    "grunt": "^1.5.3",
     "grunt-curl": "hirenj/grunt-curl",
     "grunt-git-describe": "^2.3.2",
     "grunt-githooks": "^0.3.1",
