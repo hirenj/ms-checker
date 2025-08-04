@@ -74,7 +74,7 @@ var parse_cellosaurus = function(filename) {
                     current_entry.taxid = parseInt((/NCBI_TaxID=(\d+)/.exec(line_data) || [undefined,undefined])[1]);
                 }
                 if (line_id == 'DR' && line_data.match(/BTO\;/)) {
-                    current_entry.bto = (/BTO:(\d+)/.exec(line_data) || [undefined,undefined])[1];
+                    current_entry.bto = (/BTO[\:_](\d+)/.exec(line_data) || [undefined,undefined])[1];
                 }
                 if (line_id == 'HI') {
                     current_entry.parent = (/!(.*)/.exec(line_data) || [undefined,undefined])[1].trim();
