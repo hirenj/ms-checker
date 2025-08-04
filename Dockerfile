@@ -1,9 +1,7 @@
-FROM node:16-buster
+FROM node:16-bookworm
 
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
-
-RUN echo "deb http://archive.debian.org/debian stretch main contrib non-free" > /etc/apt/sources.list
 
 RUN apt-get update \
     && apt-get install -y less awscli jq \
